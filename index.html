@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BETA-SDC 日历订阅</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #17202a;
+        background: #f5f7fa;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+
+      main {
+        width: min(92vw, 560px);
+        padding: 32px;
+        background: #fff;
+        border: 1px solid #dfe5ec;
+        border-radius: 8px;
+        box-shadow: 0 12px 32px rgb(23 32 42 / 8%);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 28px;
+      }
+
+      p {
+        line-height: 1.6;
+      }
+
+      .primary {
+        display: inline-block;
+        margin: 12px 0 20px;
+        padding: 12px 18px;
+        border-radius: 6px;
+        background: #1769aa;
+        color: #fff;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .primary:hover {
+        background: #12558b;
+      }
+
+      code {
+        display: block;
+        overflow-wrap: anywhere;
+        margin: 8px 0 18px;
+        padding: 10px;
+        background: #f0f3f6;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+
+      small {
+        color: #536273;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>BETA-SDC 日历订阅</h1>
+      <p>点击下面的按钮，将 BETA-SDC 日历添加到 Apple 日历、macOS 日历或其他支持 webcal 的应用。</p>
+      <a class="primary" href="webcal://beta-sdc.github.io/calendar/BETA-SDC.ics">点击订阅日历</a>
+      <p><strong>Google Calendar 或 Outlook：</strong>复制下面的 HTTPS 地址，在“通过网址添加/订阅”中粘贴。</p>
+      <code>https://beta-sdc.github.io/calendar/BETA-SDC.ics</code>
+      <small>这是订阅，不是一次性导入。日历应用会按自己的刷新周期获取更新。</small>
+    </main>
+  </body>
+</html>

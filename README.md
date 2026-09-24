@@ -4,6 +4,10 @@ This repository publishes the BETA-SDC calendar as an iCalendar file.
 The source file is kept unchanged and can be replaced directly with a
 new valid `.ics` file.
 
+Subscription page:
+
+https://beta-sdc.github.io/calendar/
+
 ## Subscribe
 
 Apple Calendar, macOS Calendar, and compatible apps:
