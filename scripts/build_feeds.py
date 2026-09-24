@@ -90,6 +90,9 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       a.primary {{ background: #1769aa; border-color: #1769aa; color: #fff; font-weight: 600; }}
       button {{ cursor: pointer; }}
       button:disabled, a[aria-disabled="true"] {{ opacity: .5; pointer-events: none; }}
+      .help {{ margin-top: 28px; padding-top: 20px; border-top: 1px solid #dfe5ec; }}
+      .help h2 {{ font-size: 18px; margin: 0 0 10px; }}
+      .help ul {{ margin: 0; padding-left: 20px; }}
       @media (max-width: 640px) {{
         .controls {{ grid-template-columns: 1fr; }}
         main {{ padding: 22px; }}
@@ -105,7 +108,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
         <label>分类
           <select id="scope">
             <option value="all">全部活动</option>
-            <option value="public">公开活动</option>
+            <option value="public" selected>公开活动</option>
             <option value="internal">内部事件</option>
           </select>
         </label>
@@ -129,6 +132,16 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
         <button id="copy" type="button">复制 HTTPS 地址</button>
       </div>
       <p id="status" class="muted"></p>
+      <section class="help">
+        <h2>不同系统的订阅方式</h2>
+        <ul>
+          <li><strong>iPhone、iPad、Mac：</strong>点击“点击订阅”，系统会打开日历订阅确认。</li>
+          <li><strong>Google Calendar：</strong>复制 HTTPS 地址，在网页端“其他日历”中选择“通过网址添加”。</li>
+          <li><strong>Outlook：</strong>复制 HTTPS 地址，在“添加日历”中选择“从 Internet 订阅”。</li>
+          <li><strong>Android：</strong>通常先在 Google Calendar 网页端添加，之后会同步到手机。</li>
+          <li><strong>其他支持 ICS 的应用：</strong>使用 HTTPS 地址作为网络日历订阅地址。</li>
+        </ul>
+      </section>
     </main>
     <script>
       const FEEDS = {feed_data};
