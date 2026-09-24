@@ -1,0 +1,12 @@
+name: BETA-SDC public events
+timezone: Asia/Shanghai
+
+events:
+  - summary: BETA-SDC calendar launch
+    #id: test1
+    description: |
+      Initial public calendar feed for BETA-SDC events.
+      Replace this placeholder with real public activities.
+    location: Hangzhou
+    begin: 2026-09-24 12:00:00
+    duration: { minutes: 60 }
