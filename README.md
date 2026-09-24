@@ -63,6 +63,9 @@ internal/2026/09.ics         internal events in September 2026
 The generated files are published on the `gh-pages` branch and are not
 edited manually.
 
+GitHub Pages serves the generated `gh-pages` branch. The `main` branch
+contains only source files and the build workflow.
+
 ## Subscribe
 
 The subscription page provides selectable `webcal://` and HTTPS links.
