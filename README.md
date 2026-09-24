@@ -1,42 +1,35 @@
-# BETA-SDC calendar
+# BETA-SDC Calendar
 
-Manage calendar events (converting them to an iCalendar feed, which
-can be imported into different calendar programs.  The complied feeds
-are available (with instructions) via Github Pages.
+This repository publishes the BETA-SDC calendar as an iCalendar file.
+The source file is kept unchanged and can be replaced directly with a
+new valid `.ics` file.
 
-## Using the calendars
+## Subscribe
 
-- You can import these calendars into your own calendar program.
-- Visit the GitHub pages site of this repo - this has more
-  instructions.
-- You can find various calendars available with their descriptions.
-  Take the link to the .ics file, and add it by URL to your calendar
-  program (instructions are on the page).  This normally appears as a
-  separate calendar which you can toggle on and off (you need to copy
-  the events to your own calendar to show the time as busy).
-- Your calendar program will poll the feed periodically, and any
-  updates will appear on your calendar program.  This can be anywhere
-  from a few hours to a few days.
+Apple Calendar, macOS Calendar, and compatible apps:
 
+```text
+webcal://beta-sdc.github.io/calendar/BETA-SDC.ics
+```
 
-## Adding events
+Generic HTTPS subscription:
 
-- Find the relevant calendar under `calendars/`, to which you will add
-  your new event.
-- Add your event there
-  - Realistically, copy an existing event
-  - See the [yaml2ics
-    test_calendar](https://github.com/scientific-python/yaml2ics/blob/main/example/test_calendar.yaml)
-    as an example.
-- Push or create a pull request.
+```text
+https://beta-sdc.github.io/calendar/BETA-SDC.ics
+```
 
-The default timezone for BETA-SDC calendars is `Asia/Shanghai`.
+Raw GitHub fallback:
 
+```text
+https://raw.githubusercontent.com/BETA-SDC/calendar/main/BETA-SDC.ics
+```
 
-## See also
+Use the HTTPS URL when adding a calendar by URL in Google Calendar or
+Outlook. Do not download and import the file if you want automatic
+updates; use the subscription option instead.
 
-- https://github.com/coderefinery/git-calendar - the build system
-- https://github.com/coderefinery/git-calendar-template - template if
-  you want to use this yourself.
-- https://github.com/scientific-python/yaml2ics - core tool to convert
-  yaml to ics.
+## Updating the calendar
+
+Replace `BETA-SDC.ics` with the latest valid iCalendar file and commit it
+to the `main` branch. Keep the filename unchanged so existing
+subscriptions continue using the same URL.
