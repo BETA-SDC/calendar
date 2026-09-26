@@ -70,40 +70,52 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
     <title>BETA-SDC 日历订阅</title>
     <style>
       :root {{ color-scheme: light; }}
-      body {{ margin: 0; padding: 32px 16px; color: #17202a; background: #f5f7fa;
-        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-      main {{ max-width: 760px; margin: 0 auto; padding: 28px; background: #fff;
-        border: 1px solid #dfe5ec; border-radius: 8px; }}
-      h1 {{ margin: 0 0 8px; }}
-      .muted {{ color: #536273; }}
-      .warning {{ padding: 12px; background: #fff4d6; border-left: 4px solid #d89b00; }}
-      .controls {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px; margin: 24px 0 18px; }}
-      label {{ display: grid; gap: 5px; font-weight: 600; }}
-      select, button, a.button {{ min-height: 42px; box-sizing: border-box; border: 1px solid #b9c5d1;
-        border-radius: 6px; padding: 8px 12px; background: #fff; color: #17202a;
-        font: inherit; text-decoration: none; }}
-      .timeline {{ margin: 18px 0 24px; }}
-      .timeline-head {{ display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; }}
+      * {{ box-sizing: border-box; }}
+      body {{ margin: 0; min-height: 100vh; display: grid; place-items: center;
+        padding: 20px; color: #17202a; background: #eef2f6;
+        font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+      main {{ width: min(100%, 620px); padding: 28px; background: #fff;
+        border: 1px solid #d8e0e8; border-radius: 10px;
+        box-shadow: 0 16px 40px rgb(23 32 42 / 9%); }}
+      header {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }}
+      h1 {{ margin: 0; font-size: 26px; letter-spacing: 0; }}
+      .subtitle {{ margin: 6px 0 22px; color: #536273; }}
+      .device {{ margin: 0 0 18px; padding: 10px 12px; color: #465668;
+        background: #f4f7fa; border-radius: 6px; font-size: 14px; }}
+      .controls {{ display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; }}
+      label {{ display: grid; gap: 5px; color: #536273; font-size: 13px; font-weight: 600; }}
+      select {{ width: 100%; min-height: 42px; border: 1px solid #b9c5d1; border-radius: 6px;
+        padding: 8px 10px; background: #fff; color: #17202a; font: inherit; }}
+      .timeline {{ margin: 22px 0 20px; }}
+      .timeline-head {{ display: flex; justify-content: space-between; margin-bottom: 6px;
+        color: #536273; font-size: 13px; }}
+      output {{ color: #17202a; font-weight: 700; }}
       input[type="range"] {{ width: 100%; accent-color: #1769aa; }}
-      .actions {{ display: flex; flex-wrap: wrap; gap: 10px; }}
-      a.primary {{ background: #1769aa; border-color: #1769aa; color: #fff; font-weight: 600; }}
-      button {{ cursor: pointer; }}
-      button:disabled, a[aria-disabled="true"] {{ opacity: .5; pointer-events: none; }}
-      .help {{ margin-top: 28px; padding-top: 20px; border-top: 1px solid #dfe5ec; }}
-      .help h2 {{ font-size: 18px; margin: 0 0 10px; }}
-      .help ul {{ margin: 0; padding-left: 20px; }}
-      @media (max-width: 640px) {{
-        .controls {{ grid-template-columns: 1fr; }}
+      .primary {{ display: flex; width: 100%; min-height: 48px; align-items: center;
+        justify-content: center; border: 0; border-radius: 7px; background: #1769aa;
+        color: #fff; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }}
+      .primary:hover {{ background: #12558b; }}
+      .primary:disabled, .primary[aria-disabled="true"] {{ opacity: .5; pointer-events: none; }}
+      .secondary {{ display: flex; justify-content: center; gap: 14px; margin-top: 12px;
+        color: #536273; font-size: 13px; }}
+      .secondary button, .secondary a {{ border: 0; padding: 0; background: transparent;
+        color: #1769aa; font: inherit; text-decoration: underline; cursor: pointer; }}
+      .warning {{ margin: 18px 0 0; color: #7b5b00; font-size: 13px; }}
+      @media (max-width: 560px) {{
         main {{ padding: 22px; }}
+        .controls {{ grid-template-columns: 1fr; }}
       }}
     </style>
   </head>
   <body>
     <main>
-      <h1>BETA-SDC 日历订阅</h1>
-      <p class="muted">按分类、年份和月份选择要订阅的事件范围。</p>
-      <p class="warning">内部事件订阅仅适用于确实允许公开访问的内容。GitHub Pages 不提供日历级别的访问权限。</p>
+      <header>
+        <div>
+          <h1>BETA-SDC 日历</h1>
+          <p class="subtitle">选择范围后，一键添加订阅。</p>
+        </div>
+      </header>
+      <p id="device" class="device"></p>
       <div class="controls">
         <label>分类
           <select id="scope">
@@ -121,27 +133,17 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       </div>
       <div class="timeline">
         <div class="timeline-head">
-          <strong>时间滚动</strong>
+          <span>时间范围</span>
           <output id="period-label">全部时间</output>
         </div>
         <input id="period" type="range" min="0" max="0" value="0" step="1">
       </div>
-      <div class="actions">
-        <a id="webcal" class="button primary" href="#" aria-disabled="true">点击订阅</a>
-        <a id="https" class="button" href="#" aria-disabled="true">HTTPS 地址</a>
-        <button id="copy" type="button">复制 HTTPS 地址</button>
+      <a id="action" class="primary" href="#" aria-disabled="true">准备订阅</a>
+      <div class="secondary">
+        <button id="copy" type="button">复制订阅地址</button>
+        <a id="https" href="#" aria-disabled="true">查看 HTTPS 地址</a>
       </div>
-      <p id="status" class="muted"></p>
-      <section class="help">
-        <h2>不同系统的订阅方式</h2>
-        <ul>
-          <li><strong>iPhone、iPad、Mac：</strong>点击“点击订阅”，系统会打开日历订阅确认。</li>
-          <li><strong>Google Calendar：</strong>复制 HTTPS 地址，在网页端“其他日历”中选择“通过网址添加”。</li>
-          <li><strong>Outlook：</strong>复制 HTTPS 地址，在“添加日历”中选择“从 Internet 订阅”。</li>
-          <li><strong>Android：</strong>通常先在 Google Calendar 网页端添加，之后会同步到手机。</li>
-          <li><strong>其他支持 ICS 的应用：</strong>使用 HTTPS 地址作为网络日历订阅地址。</li>
-        </ul>
-      </section>
+      <p id="status" class="warning"></p>
     </main>
     <script>
       const FEEDS = {feed_data};
@@ -151,10 +153,12 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       const month = document.querySelector("#month");
       const period = document.querySelector("#period");
       const periodLabel = document.querySelector("#period-label");
-      const webcal = document.querySelector("#webcal");
-      const https = document.querySelector("#https");
+      const device = document.querySelector("#device");
+      const action = document.querySelector("#action");
       const copy = document.querySelector("#copy");
+      const https = document.querySelector("#https");
       const status = document.querySelector("#status");
+      const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
 
       function feedKey() {{
         if (year.value === "all" && month.value === "all") return scope.value;
@@ -168,60 +172,64 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
         select.value = options.some(([value]) => value === selected) ? selected : options[0][0];
       }}
 
+      function availablePeriods() {{
+        const prefix = scope.value === "all" ? "all:" : `${{scope.value}}:`;
+        return PERIODS.filter((item) => FEEDS[`${{prefix}}${{item.year}}-${{item.month}}`]);
+      }}
+
       function refreshYears() {{
         const values = [...new Set(availablePeriods().map((item) => item.year))];
-        const selected = year.value || "all";
-        setOptions(year, [["all", "全部年份"], ...values.map((value) => [value, value])], selected);
+        setOptions(year, [["all", "全部年份"], ...values.map((value) => [value, value])], year.value || "all");
       }}
 
       function refreshMonths() {{
         const values = [...new Set(availablePeriods()
           .filter((item) => year.value === "all" || item.year === year.value)
           .map((item) => item.month))];
-        const selected = month.value || "all";
-        setOptions(month, [["all", "全年"], ...values.map((value) => [value, `${{value}} 月`])], selected);
+        setOptions(month, [["all", "全年"], ...values.map((value) => [value, `${{value}} 月`])], month.value || "all");
       }}
 
-      function availablePeriods() {{
-        const prefix = scope.value === "all" ? "all:" : `${{scope.value}}:`;
-        return PERIODS.filter((item) => FEEDS[`${{prefix}}${{item.year}}-${{item.month}}`]);
-      }}
-
-      function refreshPeriodSlider() {{
+      function refreshPeriod() {{
         const values = availablePeriods();
         period.max = Math.max(values.length - 1, 0);
+        period.disabled = !values.length;
         if (!values.length) {{
-          period.disabled = true;
           periodLabel.textContent = "暂无事件";
           return;
         }}
-        period.disabled = false;
         const current = values.findIndex((item) => item.year === year.value && item.month === month.value);
         period.value = current >= 0 ? current : 0;
-        periodLabel.textContent = `${{values[period.value].label}}`;
+        periodLabel.textContent = values[period.value].label;
       }}
 
       function refreshLinks() {{
         const feed = FEEDS[feedKey()];
         const available = Boolean(feed);
-        webcal.href = available ? feed.webcal : "#";
+        const url = available ? (isApple ? feed.webcal : feed.https) : "#";
+        action.href = url;
+        action.setAttribute("aria-disabled", String(!available));
         https.href = available ? feed.https : "#";
-        webcal.setAttribute("aria-disabled", String(!available));
         https.setAttribute("aria-disabled", String(!available));
         copy.disabled = !available;
-        status.textContent = available ? `当前选择：${{feed.title}}` : "这个时间范围暂无事件";
+        action.textContent = available
+          ? (isApple ? "订阅到 Apple 日历" : "复制订阅地址")
+          : "暂无可订阅内容";
+        device.textContent = isApple
+          ? "检测到 Apple 设备：点击主按钮即可订阅。"
+          : "当前设备：复制地址后，在 Google Calendar、Outlook 或其他日历应用中选择“通过网址订阅”。";
+        status.textContent = available ? `当前范围：${{feed.title}}` : "这个时间范围暂无事件";
       }}
 
       function refresh() {{
         refreshYears();
         refreshMonths();
-        refreshPeriodSlider();
+        refreshPeriod();
         refreshLinks();
       }}
 
-      scope.addEventListener("change", () => {{ refreshYears(); refreshMonths(); refreshPeriodSlider(); refreshLinks(); }});
-      year.addEventListener("change", () => {{ refreshMonths(); refreshPeriodSlider(); refreshLinks(); }});
-      month.addEventListener("change", () => {{ refreshPeriodSlider(); refreshLinks(); }});
+      scope.addEventListener("change", () => {{ refreshYears(); refreshMonths(); refreshPeriod(); refreshLinks(); }});
+      year.addEventListener("change", () => {{ refreshMonths(); refreshPeriod(); refreshLinks(); }});
+      month.addEventListener("change", () => {{ refreshPeriod(); refreshLinks(); }});
       period.addEventListener("input", () => {{
         const selected = availablePeriods()[period.value];
         if (!selected) return;
@@ -234,8 +242,12 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       copy.addEventListener("click", async () => {{
         const feed = FEEDS[feedKey()];
         if (!feed) return;
-        await navigator.clipboard.writeText(feed.https);
-        status.textContent = "HTTPS 地址已复制";
+        try {{
+          await navigator.clipboard.writeText(feed.https);
+          status.textContent = "订阅地址已复制";
+        }} catch {{
+          status.textContent = feed.https;
+        }}
       }});
       refresh();
     </script>
