@@ -60,11 +60,8 @@ public/2026/09.ics           public activities in September 2026
 internal/2026/09.ics         internal events in September 2026
 ```
 
-The generated files are published on the `gh-pages` branch and are not
-edited manually.
-
-GitHub Pages serves the generated `gh-pages` branch. The `main` branch
-contains only source files and the build workflow.
+The generated files are deployed by the GitHub Actions Pages workflow
+from the `main` branch. They are not committed back into the repository.
 
 ## Subscribe
 

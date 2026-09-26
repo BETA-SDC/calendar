@@ -158,7 +158,10 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       const copy = document.querySelector("#copy");
       const https = document.querySelector("#https");
       const status = document.querySelector("#status");
-      const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+      const ua = navigator.userAgent;
+      const isApple = /iPhone|iPad|iPod|Macintosh/.test(ua);
+      const isAndroid = /Android/.test(ua);
+      const isWindows = /Windows/.test(ua);
 
       function feedKey() {{
         if (year.value === "all" && month.value === "all") return scope.value;
@@ -205,20 +208,42 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       function refreshLinks() {{
         const feed = FEEDS[feedKey()];
         const available = Boolean(feed);
-        const url = available ? (isApple ? feed.webcal : feed.https) : "#";
-        action.href = url;
+        action.href = available ? (isApple ? feed.webcal : "#") : "#";
         action.setAttribute("aria-disabled", String(!available));
         https.href = available ? feed.https : "#";
         https.setAttribute("aria-disabled", String(!available));
         copy.disabled = !available;
-        action.textContent = available
-          ? (isApple ? "订阅到 Apple 日历" : "复制订阅地址")
-          : "暂无可订阅内容";
-        device.textContent = isApple
-          ? "检测到 Apple 设备：点击主按钮即可订阅。"
-          : "当前设备：复制地址后，在 Google Calendar、Outlook 或其他日历应用中选择“通过网址订阅”。";
+        if (!available) {{
+          action.textContent = "暂无可订阅内容";
+          device.textContent = "这个范围暂时没有日历事件。";
+        }} else if (isApple) {{
+          action.textContent = "订阅到 Apple 日历";
+          device.textContent = "Apple 设备：点击主按钮，确认订阅即可。";
+        }} else if (isAndroid) {{
+          action.textContent = "复制给 Google 日历";
+          device.textContent = "Android：复制地址，在 Google Calendar 网页端通过网址添加。";
+        }} else if (isWindows) {{
+          action.textContent = "复制给 Outlook";
+          device.textContent = "Windows：复制地址，在 Outlook 中从 Internet 订阅。";
+        }} else {{
+          action.textContent = "复制订阅地址";
+          device.textContent = "复制地址后，在日历应用中选择通过网址订阅。";
+        }}
         status.textContent = available ? `当前范围：${{feed.title}}` : "这个时间范围暂无事件";
       }}
+
+      action.addEventListener("click", async (event) => {{
+        if (isApple) return;
+        event.preventDefault();
+        const feed = FEEDS[feedKey()];
+        if (!feed) return;
+        try {{
+          await navigator.clipboard.writeText(feed.https);
+          status.textContent = "订阅地址已复制";
+        }} catch {{
+          status.textContent = feed.https;
+        }}
+      }});
 
       function refresh() {{
         refreshYears();
