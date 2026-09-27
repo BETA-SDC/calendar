@@ -24,7 +24,6 @@ Outlook 自动同步。
 4. 按照本教程在 Outlook 中添加日历。
 
 > 不要使用“下载 ICS”后再导入。
->
 > 下载是一次性文件；通过网址订阅才能自动获取后续更新。
 
 订阅地址可以是页面复制出的 HTTPS 地址，也可以使用对应的
@@ -146,6 +145,8 @@ webcal://beta-sdc.github.io/calendar/public.ics
 需要长期跟随更新时，请使用 **从 Web 订阅**，并在 **添加到** 中选择
 **其他日历**。
 
+---
+
 ### 为什么看不到新活动？
 
 请依次检查：
@@ -157,47 +158,10 @@ webcal://beta-sdc.github.io/calendar/public.ics
 5. 网络是否可以访问 `beta-sdc.github.io`；
 6. 是否误用了下载文件，而不是订阅地址。
 
+---
+
 ### 如何修改订阅范围？
 
 在 BETA-SDC 日历页面重新选择范围，复制新的地址，然后在 Outlook 中新增订阅。
 
 旧订阅可以在 Outlook 的日历列表中删除。
-
----
-
-## 可选补充材料
-
-相关截图放在：
-
-```text
-images/
-```
-
-相关 PDF 放在：
-
-```text
-pdf/
-```
-
-插入图片时可以使用相对路径：
-
-```markdown
-![bg contain](images/example.png)
-```
-
-添加 PDF 时，可以提供下载链接：
-
-```markdown
-[下载 PDF 教程](pdf/outlook-subscription-guide.pdf)
-```
-
----
-
-## 教程待完善
-
-这是一份 Marp 草稿。后续可以补充：
-
-- 更多实际 Outlook 网页版截图；
-- 不同语言界面的按钮名称；
-- PDF 版教程；
-- 具体的同步等待时间说明。
