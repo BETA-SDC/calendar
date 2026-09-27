@@ -162,8 +162,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       const status = document.querySelector("#status");
       const ua = navigator.userAgent;
       const isApple = /iPhone|iPad|iPod|Macintosh/.test(ua);
-      const isAndroid = /Android/.test(ua);
-      const isWindows = /Windows/.test(ua);
+      const outlookGuide = "https://github.com/BETA-SDC/calendar/blob/main/outlook-subscription-guide.md";
 
       function feedKey() {{
         if (year.value === "all" && month.value === "all") return scope.value;
@@ -224,15 +223,9 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
         }} else if (isApple) {{
           action.textContent = "订阅到 Apple 日历";
           device.textContent = "Apple 设备：点击主按钮，确认订阅即可。";
-        }} else if (isAndroid) {{
-          action.textContent = "复制给 Google 日历";
-          device.textContent = "Android：复制地址，在 Google Calendar 网页端通过网址添加。";
-        }} else if (isWindows) {{
-          action.textContent = "复制给 Outlook";
-          device.textContent = "Windows：复制地址，在 Outlook 中从 Internet 订阅。";
         }} else {{
           action.textContent = "复制订阅地址";
-          device.textContent = "复制地址后，在日历应用中选择通过网址订阅。";
+          device.innerHTML = `非 Apple 设备：请先查看<a href="${{outlookGuide}}" target="_blank" rel="noreferrer">Outlook 订阅日历指南</a>。`;
         }}
         status.textContent = available ? `当前范围：${{feed.title}}` : "这个时间范围暂无事件";
       }}
