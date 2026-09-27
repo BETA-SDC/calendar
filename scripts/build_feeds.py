@@ -225,7 +225,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
           device.textContent = "Apple 设备：点击主按钮，确认订阅即可。";
         }} else {{
           action.textContent = "复制订阅地址";
-          device.innerHTML = `非 Apple 设备：请先查看<a href="${{outlookGuide}}" target="_blank" rel="noreferrer">Outlook 订阅日历指南</a>。`;
+          device.innerHTML = `非 Apple 设备：请先查看<a href="${{outlookGuide}}" target="_blank" rel="noreferrer">Outlook 订阅日历指南</a>。推荐使用 Apple 设备订阅，操作会更方便。`;
         }}
         status.textContent = available ? `当前范围：${{feed.title}}` : "这个时间范围暂无事件";
       }}
