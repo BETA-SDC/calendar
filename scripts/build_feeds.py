@@ -162,7 +162,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       const status = document.querySelector("#status");
       const ua = navigator.userAgent;
       const isApple = /iPhone|iPad|iPod|Macintosh/.test(ua);
-      const outlookGuide = "https://github.com/BETA-SDC/calendar/blob/main/outlook-subscription-guide.md";
+      const outlookGuide = "https://github.com/BETA-SDC/calendar/blob/main/outlook-subscription-guide/README.md";
 
       function feedKey() {{
         if (year.value === "all" && month.value === "all") return scope.value;
