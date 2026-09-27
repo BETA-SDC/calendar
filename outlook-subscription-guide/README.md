@@ -9,9 +9,10 @@ backgroundImage: url('https://marp.app/assets/hero-background.svg')
 
 # 在 Outlook 中订阅 BETA-SDC 日历
 
-## 使用 Internet 日历地址，自动获取日历更新
+## 使用 Web 订阅地址，自动获取日历更新
 
-![bg right:42% contain](images/outlook-calendar-placeholder.png)
+通过 Outlook 的 **从 Web 订阅** 功能添加日历，后续活动更新会由
+Outlook 自动同步。
 
 ---
 
@@ -26,7 +27,8 @@ backgroundImage: url('https://marp.app/assets/hero-background.svg')
 >
 > 下载是一次性文件；通过网址订阅才能自动获取后续更新。
 
-![bg right:38% contain](images/01-copy-subscription-url.png)
+订阅地址可以是页面复制出的 HTTPS 地址，也可以使用对应的
+`webcal://` 地址。
 
 ---
 
@@ -36,82 +38,71 @@ backgroundImage: url('https://marp.app/assets/hero-background.svg')
 
 登录 [Outlook 网页版](https://outlook.live.com/calendar/)，进入 **日历**。
 
-![bg right:40% contain](images/02-outlook-calendar.png)
+在左侧选择 **添加日历**。
 
 ---
 
 ## Outlook 网页版
 
-### 2. 添加日历
+### 2. 选择“从 Web 订阅”
 
-在左侧日历列表中选择：
+在“添加日历”面板中选择 **从 Web 订阅**。
 
-**添加日历** → **从 Web 订阅**
-
-不同版本的 Outlook 可能显示为：
+部分版本可能显示为：
 
 - **从 Internet 订阅**
 - **订阅自 Web**
 - **Subscribe from web**
 
-![bg right:40% contain](images/03-add-calendar.png)
+![从 Web 订阅入口](images/02-add-calendar-web.png)
 
 ---
 
 ## Outlook 网页版
 
-### 3. 粘贴地址
+### 3. 粘贴订阅地址
 
 将刚才复制的订阅地址粘贴到网址输入框。
 
+例如：
+
 ```text
-https://beta-sdc.github.io/calendar/public.ics
+webcal://beta-sdc.github.io/calendar/public.ics
 ```
 
-然后选择 **导入**、**订阅** 或 **添加**。
+然后填写日历名称和颜色。
 
-![bg right:40% contain](images/04-paste-url.png)
-
----
-
-## 4. 设置名称和颜色
-
-建议使用容易识别的名称，例如：
-
-- `BETA 公开活动`
-- `BETA-SDC 内部日历`
-- `BETA-SDC 全部活动`
-
-可以根据需要选择颜色，方便与个人日历区分。
-
-![bg right:40% contain](images/05-calendar-settings.png)
+![订阅地址与日历选项](images/03-subscription-options.png)
 
 ---
 
-## 5. 检查订阅是否成功
+## 关键选项：添加到“其他日历”
+
+在 **添加到** 下拉选项中，必须选择：
+
+**其他日历**
+
+然后点击 **导入**。
+
+> 请务必选择“其他日历”，不要把订阅内容当作个人日历事件导入。
+>
+> 只有以日历订阅的方式添加，Outlook 才能继续从订阅地址获取更新；
+> 如果选择了其他导入方式，后续活动变化可能不会自动同步。
+
+![选择其他日历](images/03-subscription-options.png)
+
+---
+
+## 订阅成功后的表现
 
 添加完成后，确认：
 
-- 日历出现在左侧日历列表中；
-- 能看到活动标题、时间和地点；
-- 事件提醒按照日历应用设置正常显示；
-- 日历名称旁边显示订阅或 Internet 日历标识。
+- 日历出现在左侧的 **其他日历** 分组中；
+- 日历名称旁边显示已启用状态；
+- 日历中能看到活动标题、时间和地点；
+- 后续重新发布活动后，Outlook 可以继续同步更新。
 
-![bg right:40% contain](images/06-subscription-complete.png)
-
----
-
-## Outlook 桌面版
-
-如果你使用 Windows 版 Outlook，可以尝试：
-
-**文件** → **账户设置** → **账户设置** → **Internet 日历** → **新建**
-
-粘贴订阅地址后，按照提示完成添加。
-
-不同版本的 Outlook 菜单名称可能略有差异。
-
-![bg right:40% contain](images/07-outlook-desktop.png)
+![订阅成功后的日历](images/06-subscription-complete.png)
 
 ---
 
@@ -148,7 +139,8 @@ https://beta-sdc.github.io/calendar/public.ics
 
 可以打开，但这通常会变成一次性导入，之后源日历的修改不会自动同步。
 
-需要长期跟随更新时，请使用 **从 Web 订阅**。
+需要长期跟随更新时，请使用 **从 Web 订阅**，并在 **添加到** 中选择
+**其他日历**。
 
 ### 为什么看不到新活动？
 
@@ -156,9 +148,10 @@ https://beta-sdc.github.io/calendar/public.ics
 
 1. 订阅地址是否复制完整；
 2. 选择的分类、年份和月份是否正确；
-3. Outlook 是否已经完成同步；
-4. 网络是否可以访问 `beta-sdc.github.io`；
-5. 是否误用了下载文件，而不是订阅地址。
+3. **添加到** 是否选择了 **其他日历**；
+4. Outlook 是否已经完成同步；
+5. 网络是否可以访问 `beta-sdc.github.io`；
+6. 是否误用了下载文件，而不是订阅地址。
 
 ### 如何修改订阅范围？
 
@@ -200,8 +193,7 @@ pdf/
 
 这是一份 Marp 草稿。后续可以补充：
 
-- 实际 Outlook 网页版截图；
-- Windows 桌面版截图；
+- 更多实际 Outlook 网页版截图；
 - 不同语言界面的按钮名称；
 - PDF 版教程；
 - 具体的同步等待时间说明。
