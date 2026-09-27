@@ -62,6 +62,8 @@ internal/2026/09.ics         internal events in September 2026
 
 The generated files are deployed by the GitHub Actions Pages workflow
 from the `main` branch. They are not committed back into the repository.
+The workflow also runs once per day so that scheduled changes can be
+published without a source commit.
 
 ## Subscribe
 
@@ -75,8 +77,15 @@ webcal://beta-sdc.github.io/calendar/internal.ics
 ```
 
 Use the HTTPS URL when adding a calendar by URL in Google Calendar or
-Outlook. Do not download and import the file if you want automatic
-updates; use the subscription option instead.
+Outlook. The subscription page also has a direct ICS download link:
+public downloads use the default filename `BETA.ics`, while internal and
+all-event downloads use `BETA-SDC.ics`. Do not download and import the
+file if you want automatic updates; use the subscription option instead.
+
+Generated feeds preserve the event properties and subcomponents from the
+source ICS files, including reminders (`VALARM`) and attachments
+(`ATTACH`). The build does not remove these fields, so subscribed
+calendars can continue to deliver event reminders.
 
 ## Updating events
 

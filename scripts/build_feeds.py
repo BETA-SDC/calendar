@@ -142,6 +142,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       <div class="secondary">
         <button id="copy" type="button">复制订阅地址</button>
         <a id="https" href="#" aria-disabled="true">查看 HTTPS 地址</a>
+        <a id="download" href="#" aria-disabled="true">下载 ICS</a>
       </div>
       <p id="status" class="warning"></p>
     </main>
@@ -157,6 +158,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       const action = document.querySelector("#action");
       const copy = document.querySelector("#copy");
       const https = document.querySelector("#https");
+      const download = document.querySelector("#download");
       const status = document.querySelector("#status");
       const ua = navigator.userAgent;
       const isApple = /iPhone|iPad|iPod|Macintosh/.test(ua);
@@ -212,6 +214,9 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
         action.setAttribute("aria-disabled", String(!available));
         https.href = available ? feed.https : "#";
         https.setAttribute("aria-disabled", String(!available));
+        download.href = available ? feed.https : "#";
+        download.download = scope.value === "public" ? "BETA.ics" : "BETA-SDC.ics";
+        download.setAttribute("aria-disabled", String(!available));
         copy.disabled = !available;
         if (!available) {{
           action.textContent = "暂无可订阅内容";
