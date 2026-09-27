@@ -54,7 +54,9 @@ Outlook 自动同步。
 - **订阅自 Web**
 - **Subscribe from web**
 
-![bg right:45% contain 从 Web 订阅入口](images/02-add-calendar-web.png)
+---
+
+![bg contain](images/02-add-calendar-web.png)
 
 ---
 
@@ -72,7 +74,9 @@ webcal://beta-sdc.github.io/calendar/public.ics
 
 然后填写日历名称和颜色。
 
-![bg right:45% contain 订阅地址与日历选项](images/03-subscription-options.png)
+---
+
+![bg contain](images/03-subscription-options.png)
 
 ---
 
@@ -89,8 +93,6 @@ webcal://beta-sdc.github.io/calendar/public.ics
 > 只有以日历订阅的方式添加，Outlook 才能继续从订阅地址获取更新；
 > 如果选择了其他导入方式，后续活动变化可能不会自动同步。
 
-![bg right:45% contain 选择其他日历](images/03-subscription-options.png)
-
 ---
 
 ## 订阅成功后的表现
@@ -102,7 +104,9 @@ webcal://beta-sdc.github.io/calendar/public.ics
 - 日历中能看到活动标题、时间和地点；
 - 后续重新发布活动后，Outlook 可以继续同步更新。
 
-![bg right:45% contain 订阅成功后的日历](images/06-subscription-complete.png)
+---
+
+![bg contain](images/06-subscription-complete.png)
 
 ---
 
@@ -178,7 +182,7 @@ pdf/
 插入图片时可以使用相对路径：
 
 ```markdown
-![bg right:45% contain Outlook 添加日历](images/example.png)
+![bg contain](images/example.png)
 ```
 
 添加 PDF 时，可以提供下载链接：
