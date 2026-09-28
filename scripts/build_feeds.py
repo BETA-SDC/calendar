@@ -70,7 +70,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BETA</title>
+    <title>BETA 日历订阅</title>
     <style>
       :root {{ color-scheme: light; }}
       * {{ box-sizing: border-box; }}
@@ -114,7 +114,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
     <main>
       <header>
         <div>
-          <h1>BETA</h1>
+          <h1>BETA 日历订阅</h1>
           <p class="subtitle">选择范围后，一键添加订阅。</p>
         </div>
       </header>
