@@ -1,4 +1,7 @@
-/out/
+*.py[cod]
+/.playwright-cli/
 /.venv/
 /.venv-build/
+/output/
 /site/
+__pycache__/

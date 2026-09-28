@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BETA 日历订阅</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>BETA 日历订阅</h1>
+        <p class="subtitle">选择范围后，一键添加订阅。</p>
+      </header>
+      <div class="layout">
+        <section>
+          <div class="controls">
+            <label>分类
+              <select id="scope">
+                <option value="all">全部活动</option>
+                <option value="public" selected>公开活动</option>
+                <option value="internal">内部事件</option>
+              </select>
+            </label>
+            <label>年份
+              <select id="year"></select>
+            </label>
+            <label>月份
+              <select id="month"></select>
+            </label>
+          </div>
+          <div class="timeline">
+            <div class="timeline-head">
+              <span>时间范围</span>
+              <output id="period-label">全部时间</output>
+            </div>
+            <input id="period" type="range" min="0" max="0" value="0" step="1">
+          </div>
+          <a id="action" class="primary" href="#" aria-disabled="true">准备订阅</a>
+          <div class="secondary">
+            <button id="copy" type="button">复制订阅地址</button>
+            <a id="https" href="#" aria-disabled="true">查看 HTTPS 地址</a>
+            <a id="download" href="#" aria-disabled="true">下载 ICS</a>
+          </div>
+          <p id="status" class="warning"></p>
+        </section>
+        <aside class="guide">
+          <h2 id="guide-title">订阅说明</h2>
+          <div id="device" class="device"></div>
+        </aside>
+      </div>
+    </main>
+
+    <template id="apple-guidance">
+      <strong>浏览器要求</strong>
+      <p>微信内置浏览器不支持 webcal，请使用 Safari 打开本页面。</p>
+      <strong>订阅设置</strong>
+      <ul>
+        <li>取消勾选“移除提醒”和“移除附件”</li>
+        <li>iPhone：默认刷新较频繁，可保持默认</li>
+        <li>Mac：将“自动刷新”设为“每小时”</li>
+      </ul>
+    </template>
+
+    <template id="other-guidance">
+      <p>
+        复制订阅地址后，在系统日历、Google Calendar、Outlook 或
+        Thunderbird 中选择“通过网址”或“Internet 日历订阅”。
+      </p>
+      <p>
+        <a
+          href="https://github.com/BETA-SDC/calendar/blob/main/outlook-subscription-guide/README.md"
+          target="_blank"
+          rel="noreferrer"
+        >查看 Outlook 订阅指南</a>
+      </p>
+      <p>下载 ICS 通常不会自动同步，建议优先使用订阅地址。</p>
+    </template>
+  </body>
+</html>

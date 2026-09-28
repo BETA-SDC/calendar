@@ -7,7 +7,20 @@ Subscription page:
 
 https://beta-sdc.github.io/calendar/
 
-## Source layout
+## Repository layout
+
+```text
+public/                       public one-event ICS sources
+internal/                     internal one-event ICS sources
+web/                          subscription page HTML, CSS, and JavaScript
+scripts/build_feeds.py        validation and feed/site generator
+tests/test_build_feeds.py     feed and site regression tests
+outlook-subscription-guide/   Outlook-specific instructions and assets
+```
+
+Generated files are written to `site/` locally and are not committed.
+
+## Event source layout
 
 Each source file contains exactly one event. Use a readable filename:
 
@@ -65,6 +78,9 @@ from the `main` branch. They are not committed back into the repository.
 The workflow also runs once per day so that scheduled changes can be
 published without a source commit.
 
+The subscription page loads generated feed metadata from
+`calendar-data.json`. Its maintained source files live under `web/`.
+
 ## Subscribe
 
 The subscription page provides selectable `webcal://` and HTTPS links.
@@ -97,3 +113,24 @@ Add, edit, move, or delete one-event ICS files under `public/` or
 `internal/`, then commit to `main`. The workflow validates every source
 file and rebuilds all aggregate feeds. Month and year options appear
 automatically when their directories contain events.
+
+The source directory must match the event's `DTSTART` year and month.
+Every event must have a non-empty, repository-wide unique `UID`.
+
+## Local verification
+
+Install dependencies, run the tests, and build the same output used by
+GitHub Pages:
+
+```bash
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
+python scripts/build_feeds.py --output site
+```
+
+Serve `site/` over HTTP when checking the subscription page locally,
+because the page loads `calendar-data.json` with `fetch()`:
+
+```bash
+python -m http.server 8000 --directory site
+```
