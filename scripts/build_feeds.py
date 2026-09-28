@@ -226,7 +226,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
           device.textContent = "Apple 设备：点击主按钮，确认订阅即可。";
         }} else {{
           action.textContent = "复制订阅地址";
-          device.innerHTML = `非 Apple 设备：可点击“下载 ICS 导入系统日历”后打开导入；若要自动同步，请查看<a href="${{outlookGuide}}" target="_blank" rel="noreferrer">Outlook 订阅日历指南</a>。推荐使用 Apple 设备订阅，操作会更方便。`;
+          device.innerHTML = `非 Apple 设备：可复制订阅地址，在系统日历、Google Calendar、Outlook、Thunderbird 等应用中选择“通过网址/Internet 日历订阅”；Outlook 可参考<a href="${{outlookGuide}}" target="_blank" rel="noreferrer">订阅日历指南</a>。也可以点击“下载 ICS 导入系统日历”，但导入通常不会自动同步。推荐使用 Apple 设备订阅，操作会更方便。`;
         }}
         status.textContent = available ? `当前范围：${{feed.title}}` : "这个时间范围暂无事件";
       }}
