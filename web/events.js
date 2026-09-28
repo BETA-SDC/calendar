@@ -81,24 +81,24 @@ function eventTime(event) {
   return `${start}–${timeFormatter.format(new Date(event.end))}`;
 }
 
-function createActionLink(label, event) {
+function createActionLink(label, event, download = false) {
   const link = document.createElement("a");
   link.className = "event-action";
   link.href = event.url;
-  link.download = event.filename;
+  if (download) link.download = event.filename;
   link.textContent = label;
   return link;
 }
 
 function createCopyButton(event) {
   const button = document.createElement("button");
-  button.className = "event-action";
+  button.className = "event-action event-copy";
   button.type = "button";
-  button.textContent = "复制下载链接";
+  button.textContent = "复制订阅链接";
   button.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(event.url);
-      elements.status.textContent = `已复制：${event.title}`;
+      elements.status.textContent = `已复制订阅链接：${event.title}`;
     } catch {
       elements.status.textContent = event.url;
     }
@@ -130,7 +130,11 @@ function createEventRow(event) {
 
   const actions = document.createElement("div");
   actions.className = "event-actions";
-  actions.append(createActionLink("下载 ICS", event), createCopyButton(event));
+  actions.append(
+    createActionLink("下载 ICS", event, true),
+    createActionLink("打开订阅链接", event),
+    createCopyButton(event),
+  );
 
   article.append(details, actions);
   return article;

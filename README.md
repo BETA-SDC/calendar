@@ -86,8 +86,8 @@ published without a source commit.
 The subscription page loads generated feed metadata from
 `calendar-data.json`. Its maintained source files live under `web/`.
 The single-event page loads generated event metadata from
-`events-data.json`, groups events by date, and provides download and
-copy-link actions.
+`events-data.json`, groups events by date, and provides download, open
+subscription-link, and copy-subscription-link actions.
 
 Each source event is also published at the same relative path on GitHub
 Pages. For example:

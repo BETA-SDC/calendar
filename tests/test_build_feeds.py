@@ -95,6 +95,9 @@ class BuildFeedsTest(unittest.TestCase):
             'href="index.html"',
             (self.output / "events.html").read_text(encoding="utf-8"),
         )
+        event_script = (self.output / "events.js").read_text(encoding="utf-8")
+        for label in ("下载 ICS", "打开订阅链接", "复制订阅链接"):
+            self.assertIn(label, event_script)
 
     def test_individual_event_data_is_sorted_and_linked(self) -> None:
         data = json.loads((self.output / "events-data.json").read_text(encoding="utf-8"))
