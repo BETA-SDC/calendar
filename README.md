@@ -53,9 +53,9 @@ Locations use the following convention:
 云谷校区 H4-121
 ```
 
-`H4-xxx` is the building/room identifier inside the Xihu University
-Yungu Campus. Source files do not include Apple Maps coordinates unless
-they have been verified.
+`H4-xxx` is the building/room identifier on Westlake University's Yungu
+Campus. Source files do not include Apple Maps coordinates unless they
+have been verified.
 
 ## Generated feeds
 
