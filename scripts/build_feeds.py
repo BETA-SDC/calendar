@@ -161,7 +161,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
           <p id="status" class="warning"></p>
         </section>
         <aside class="guide">
-          <h2>订阅说明</h2>
+          <h2 id="guide-title">订阅说明</h2>
           <div id="device" class="device"></div>
         </aside>
       </div>
@@ -174,6 +174,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       const month = document.querySelector("#month");
       const period = document.querySelector("#period");
       const periodLabel = document.querySelector("#period-label");
+      const guideTitle = document.querySelector("#guide-title");
       const device = document.querySelector("#device");
       const action = document.querySelector("#action");
       const copy = document.querySelector("#copy");
@@ -182,6 +183,7 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       const status = document.querySelector("#status");
       const ua = navigator.userAgent;
       const isApple = /iPhone|iPad|iPod|Macintosh/.test(ua);
+      guideTitle.textContent = isApple ? " Apple 订阅说明" : "订阅说明";
       const outlookGuide = "https://github.com/BETA-SDC/calendar/blob/main/outlook-subscription-guide/README.md";
 
       function feedKey() {{
