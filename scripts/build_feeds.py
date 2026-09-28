@@ -170,6 +170,18 @@ def copy_web_assets(output: Path, web_root: Path) -> None:
         shutil.copy2(source, output / filename)
 
 
+def copy_source_events(
+    output: Path,
+    entries: Iterable[SourceEvent],
+    source_root: Path,
+) -> None:
+    for entry in entries:
+        relative_path = entry.path.relative_to(source_root)
+        destination = output / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(entry.path, destination)
+
+
 def write_calendar_data(
     output: Path,
     feeds: dict[str, dict[str, str]],
@@ -267,6 +279,7 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
             )
 
     copy_web_assets(output, web_root)
+    copy_source_events(output, all_entries, source_root)
     write_calendar_data(output, feeds, group_by_month(all_entries))
 
 

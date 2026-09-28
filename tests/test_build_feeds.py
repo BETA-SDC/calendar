@@ -80,6 +80,16 @@ class BuildFeedsTest(unittest.TestCase):
             data["periods"],
         )
 
+    def test_individual_event_files_are_published(self) -> None:
+        relative_path = Path(
+            "public/2026/09/"
+            "2026-09-29-beta-meet-09-tibet-biodiversity-field-survey.ics"
+        )
+        self.assertEqual(
+            (self.output / relative_path).read_bytes(),
+            (REPOSITORY_ROOT / relative_path).read_bytes(),
+        )
+
     def test_event_properties_survive_aggregation(self) -> None:
         uid = "C8835A1E-C99B-4DE1-B5BB-67F8CCFECDA0"
         internal = self.read_calendar("internal.ics")

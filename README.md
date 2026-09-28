@@ -81,6 +81,17 @@ published without a source commit.
 The subscription page loads generated feed metadata from
 `calendar-data.json`. Its maintained source files live under `web/`.
 
+Each source event is also published at the same relative path on GitHub
+Pages. For example:
+
+```text
+https://beta-sdc.github.io/calendar/public/2026/09/2026-09-29-beta-meet-09-tibet-biodiversity-field-survey.ics
+```
+
+Use an individual event URL for a one-time calendar import, such as an
+"Add to calendar" link in an email. Use an aggregate subscription URL
+when recipients should continue receiving future additions and updates.
+
 ## Subscribe
 
 The subscription page provides selectable `webcal://` and HTTPS links.
