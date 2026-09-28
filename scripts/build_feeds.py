@@ -77,14 +77,19 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       body {{ margin: 0; min-height: 100vh; display: grid; place-items: center;
         padding: 20px; color: #17202a; background: #eef2f6;
         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-      main {{ width: min(100%, 620px); padding: 28px; background: #fff;
+      main {{ width: min(100%, 920px); padding: 28px; background: #fff;
         border: 1px solid #d8e0e8; border-radius: 10px;
         box-shadow: 0 16px 40px rgb(23 32 42 / 9%); }}
       header {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }}
       h1 {{ margin: 0; font-size: 26px; letter-spacing: 0; }}
-      .subtitle {{ margin: 6px 0 22px; color: #536273; }}
-      .device {{ margin: 0 0 18px; padding: 10px 12px; color: #465668;
-        background: #f4f7fa; border-radius: 6px; font-size: 14px; }}
+      .subtitle {{ margin: 6px 0 24px; color: #536273; }}
+      .layout {{ display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 28px; }}
+      .guide {{ border-left: 1px solid #d8e0e8; padding-left: 28px; }}
+      .guide h2 {{ margin: 0 0 12px; font-size: 17px; letter-spacing: 0; }}
+      .device {{ margin: 0; color: #465668; font-size: 14px; overflow-wrap: anywhere; }}
+      .device p {{ margin: 4px 0 12px; }}
+      .device ul {{ margin: 4px 0 0; padding-left: 20px; }}
+      .device li + li {{ margin-top: 4px; }}
       .controls {{ display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; }}
       label {{ display: grid; gap: 5px; color: #536273; font-size: 13px; font-weight: 600; }}
       select {{ width: 100%; min-height: 42px; border: 1px solid #b9c5d1; border-radius: 6px;
@@ -104,6 +109,11 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
       .secondary button, .secondary a {{ border: 0; padding: 0; background: transparent;
         color: #1769aa; font: inherit; text-decoration: underline; cursor: pointer; }}
       .warning {{ margin: 18px 0 0; color: #7b5b00; font-size: 13px; }}
+      @media (max-width: 760px) {{
+        .layout {{ grid-template-columns: 1fr; }}
+        .guide {{ border-top: 1px solid #d8e0e8; border-left: 0; padding-top: 22px;
+          padding-left: 0; }}
+      }}
       @media (max-width: 560px) {{
         main {{ padding: 22px; }}
         .controls {{ grid-template-columns: 1fr; }}
@@ -118,36 +128,43 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
           <p class="subtitle">选择范围后，一键添加订阅。</p>
         </div>
       </header>
-      <p id="device" class="device"></p>
-      <div class="controls">
-        <label>分类
-          <select id="scope">
-            <option value="all">全部活动</option>
-            <option value="public" selected>公开活动</option>
-            <option value="internal">内部事件</option>
-          </select>
-        </label>
-        <label>年份
-          <select id="year"></select>
-        </label>
-        <label>月份
-          <select id="month"></select>
-        </label>
+      <div class="layout">
+        <section>
+          <div class="controls">
+            <label>分类
+              <select id="scope">
+                <option value="all">全部活动</option>
+                <option value="public" selected>公开活动</option>
+                <option value="internal">内部事件</option>
+              </select>
+            </label>
+            <label>年份
+              <select id="year"></select>
+            </label>
+            <label>月份
+              <select id="month"></select>
+            </label>
+          </div>
+          <div class="timeline">
+            <div class="timeline-head">
+              <span>时间范围</span>
+              <output id="period-label">全部时间</output>
+            </div>
+            <input id="period" type="range" min="0" max="0" value="0" step="1">
+          </div>
+          <a id="action" class="primary" href="#" aria-disabled="true">准备订阅</a>
+          <div class="secondary">
+            <button id="copy" type="button">复制订阅地址</button>
+            <a id="https" href="#" aria-disabled="true">查看 HTTPS 地址</a>
+            <a id="download" href="#" aria-disabled="true">下载 ICS</a>
+          </div>
+          <p id="status" class="warning"></p>
+        </section>
+        <aside class="guide">
+          <h2>订阅说明</h2>
+          <div id="device" class="device"></div>
+        </aside>
       </div>
-      <div class="timeline">
-        <div class="timeline-head">
-          <span>时间范围</span>
-          <output id="period-label">全部时间</output>
-        </div>
-        <input id="period" type="range" min="0" max="0" value="0" step="1">
-      </div>
-      <a id="action" class="primary" href="#" aria-disabled="true">准备订阅</a>
-      <div class="secondary">
-        <button id="copy" type="button">复制订阅地址</button>
-        <a id="https" href="#" aria-disabled="true">查看 HTTPS 地址</a>
-        <a id="download" href="#" aria-disabled="true">下载 ICS</a>
-      </div>
-      <p id="status" class="warning"></p>
     </main>
     <script>
       const FEEDS = {feed_data};
@@ -226,7 +243,14 @@ def make_index(output: Path, feeds: dict[str, dict[str, str]], periods: list[tup
           device.textContent = "这个范围暂时没有日历事件。";
         }} else if (isApple) {{
           action.textContent = "订阅到 Apple 日历";
-          device.textContent = "Apple 设备：微信内置浏览器不支持 webcal 订阅，请使用 Safari 浏览器打开本页面。订阅时请取消勾选“移除提醒”和“移除附件”。iPhone 默认刷新较频繁，可保持默认；Mac 建议将“自动刷新”设为“每小时”，以便更快获取最新活动信息。";
+          device.innerHTML = `<strong>浏览器要求</strong>
+            <p>微信内置浏览器不支持 webcal，请使用 Safari 打开本页面。</p>
+            <strong>订阅设置</strong>
+            <ul>
+              <li>取消勾选“移除提醒”和“移除附件”</li>
+              <li>iPhone：默认刷新较频繁，可保持默认</li>
+              <li>Mac：将“自动刷新”设为“每小时”</li>
+            </ul>`;
         }} else {{
           action.textContent = "复制订阅地址";
           device.innerHTML = `非 Apple 设备：可复制订阅地址，在系统日历、Google Calendar、Outlook、Thunderbird 等应用中选择“通过网址/Internet 日历订阅”；Outlook 可参考<a href="${{outlookGuide}}" target="_blank" rel="noreferrer">订阅日历指南</a>。也可以点击“下载 ICS 导入系统日历”，但导入通常不会自动同步。推荐使用 Apple 设备订阅，操作会更方便。`;
