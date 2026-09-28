@@ -13,6 +13,7 @@ from icalendar import Calendar
 
 
 ROOT_CATEGORIES = ("public", "internal")
+REFRESH_INTERVAL = "PT1H"
 
 
 def read_event(path: Path) -> tuple[Calendar, object]:
@@ -37,6 +38,8 @@ def build_calendar(name: str, events: list[object], timezones: list[object]) -> 
     calendar.add("CALSCALE", "GREGORIAN")
     calendar.add("X-WR-CALNAME", name)
     calendar.add("X-WR-TIMEZONE", "Asia/Shanghai")
+    calendar.add("REFRESH-INTERVAL", REFRESH_INTERVAL, parameters={"VALUE": "DURATION"})
+    calendar.add("X-PUBLISHED-TTL", REFRESH_INTERVAL)
 
     seen_timezones: set[bytes] = set()
     for timezone in timezones:

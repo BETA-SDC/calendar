@@ -87,6 +87,10 @@ source ICS files, including reminders (`VALARM`) and attachments
 (`ATTACH`). The build does not remove these fields, so subscribed
 calendars can continue to deliver event reminders.
 
+Generated feeds request an hourly subscription refresh with
+`REFRESH-INTERVAL;VALUE=DURATION:PT1H` and `X-PUBLISHED-TTL:PT1H`.
+Calendar applications may allow users to override this suggested interval.
+
 ## Updating events
 
 Add, edit, move, or delete one-event ICS files under `public/` or
