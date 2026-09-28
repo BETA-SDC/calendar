@@ -66,7 +66,15 @@ class BuildFeedsTest(unittest.TestCase):
             self.assertEqual(str(calendar.get("X-PUBLISHED-TTL")), "PT1H")
 
     def test_web_assets_and_data_are_generated(self) -> None:
-        for filename in ("index.html", "styles.css", "app.js", "calendar-data.json"):
+        for filename in (
+            "index.html",
+            "events.html",
+            "styles.css",
+            "app.js",
+            "events.js",
+            "calendar-data.json",
+            "events-data.json",
+        ):
             self.assertTrue((self.output / filename).is_file(), filename)
 
         data = json.loads((self.output / "calendar-data.json").read_text(encoding="utf-8"))
@@ -78,6 +86,35 @@ class BuildFeedsTest(unittest.TestCase):
         self.assertIn(
             {"year": "2026", "month": "10", "label": "2026-10"},
             data["periods"],
+        )
+        self.assertIn(
+            'href="events.html"',
+            (self.output / "index.html").read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            'href="index.html"',
+            (self.output / "events.html").read_text(encoding="utf-8"),
+        )
+
+    def test_individual_event_data_is_sorted_and_linked(self) -> None:
+        data = json.loads((self.output / "events-data.json").read_text(encoding="utf-8"))
+        events = data["events"]
+        self.assertEqual(
+            [event["start"] for event in events],
+            sorted(event["start"] for event in events),
+        )
+        target = next(
+            event
+            for event in events
+            if event["uid"] == "13B7ECF2-A67B-4388-A043-1FCE2E6D578A"
+        )
+        self.assertEqual(target["scopeLabel"], "公开活动")
+        self.assertEqual(target["date"], "2026-09-29")
+        self.assertEqual(target["location"], "云谷校区 H4-103")
+        self.assertEqual(
+            target["url"],
+            "https://beta-sdc.github.io/calendar/public/2026/09/"
+            "2026-09-29-beta-meet-09-tibet-biodiversity-field-survey.ics",
         )
 
     def test_individual_event_files_are_published(self) -> None:

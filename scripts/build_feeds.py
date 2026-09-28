@@ -19,7 +19,7 @@ ROOT_CATEGORIES = ("public", "internal")
 SCOPE_LABELS = {"public": "公开活动", "internal": "内部事件"}
 REFRESH_INTERVAL = "PT1H"
 BASE_URL = "https://beta-sdc.github.io/calendar"
-WEB_ASSETS = ("index.html", "styles.css", "app.js")
+WEB_ASSETS = ("index.html", "events.html", "styles.css", "app.js", "events.js")
 
 
 @dataclass(frozen=True)
@@ -200,6 +200,45 @@ def write_calendar_data(
     )
 
 
+def serialize_event(entry: SourceEvent, source_root: Path) -> dict[str, Any]:
+    start = entry.event.decoded("DTSTART")
+    end = entry.event.decoded("DTEND") if entry.event.get("DTEND") else None
+    relative_path = entry.path.relative_to(source_root)
+    return {
+        "uid": event_uid(entry.event, entry.path),
+        "scope": entry.scope,
+        "scopeLabel": SCOPE_LABELS[entry.scope],
+        "title": str(entry.event.get("SUMMARY", "")).strip(),
+        "start": start.isoformat(),
+        "end": end.isoformat() if end else None,
+        "allDay": not hasattr(start, "hour"),
+        "date": f"{start.year:04d}-{start.month:02d}-{start.day:02d}",
+        "year": entry.year,
+        "month": entry.month,
+        "location": str(entry.event.get("LOCATION", "")).strip(),
+        "url": f"{BASE_URL}/{relative_path.as_posix()}",
+        "filename": relative_path.name,
+    }
+
+
+def write_event_data(
+    output: Path,
+    entries: Iterable[SourceEvent],
+    source_root: Path,
+) -> None:
+    events = [
+        serialize_event(entry, source_root)
+        for entry in sorted(
+            entries,
+            key=lambda item: item.event.decoded("DTSTART").isoformat(),
+        )
+    ]
+    (output / "events-data.json").write_text(
+        json.dumps({"events": events}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def build_site(source_root: Path, output: Path, web_root: Path | None = None) -> None:
     web_root = web_root or source_root / "web"
     if output.exists():
@@ -281,6 +320,7 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
     copy_web_assets(output, web_root)
     copy_source_events(output, all_entries, source_root)
     write_calendar_data(output, feeds, group_by_month(all_entries))
+    write_event_data(output, all_entries, source_root)
 
 
 def main() -> None:

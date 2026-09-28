@@ -7,6 +7,10 @@ Subscription page:
 
 https://beta-sdc.github.io/calendar/
 
+Single-event page:
+
+https://beta-sdc.github.io/calendar/events.html
+
 ## Repository layout
 
 ```text
@@ -80,6 +84,9 @@ published without a source commit.
 
 The subscription page loads generated feed metadata from
 `calendar-data.json`. Its maintained source files live under `web/`.
+The single-event page loads generated event metadata from
+`events-data.json`, groups events by date, and provides download and
+copy-link actions.
 
 Each source event is also published at the same relative path on GitHub
 Pages. For example:
