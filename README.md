@@ -35,9 +35,9 @@ Current categories:
 Locations use the following convention:
 
 ```text
-西湖大学云谷校区 H4-103
-西湖大学云谷校区 H4-104
-西湖大学云谷校区 H4-121
+云谷校区 H4-103
+云谷校区 H4-104
+云谷校区 H4-121
 ```
 
 `H4-xxx` is the building/room identifier inside the Xihu University
