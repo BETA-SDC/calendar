@@ -20,6 +20,7 @@ web/                          subscription page HTML, CSS, and JavaScript
 scripts/build_feeds.py        validation and feed/site generator
 tests/test_build_feeds.py     feed and site regression tests
 outlook-subscription-guide/   Outlook-specific instructions and assets
+docs/                         operating guides for calendar links
 ```
 
 Generated files are written to `site/` locally and are not committed.
@@ -95,9 +96,14 @@ Pages. For example:
 https://beta-sdc.github.io/calendar/public/2026/09/2026-09-29-beta-meet-09-tibet-biodiversity-field-survey.ics
 ```
 
-Use an individual event URL for a one-time calendar import, such as an
-"Add to calendar" link in an email. Use an aggregate subscription URL
-when recipients should continue receiving future additions and updates.
+Use an individual event URL for an "Add to calendar" link in an email.
+Calendar applications decide whether a remote ICS URL is downloaded or
+subscribed; iPhone may treat the URL as a one-event subscription. Use an
+aggregate subscription URL when recipients should continue receiving
+future additions and updates.
+
+For the recommended email wording and `Command + K` instructions, see
+[在邮件中添加日历链接](docs/email-calendar-links.md).
 
 ## Subscribe
 
