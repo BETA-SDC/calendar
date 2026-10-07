@@ -130,6 +130,34 @@ class BuildFeedsTest(unittest.TestCase):
             (REPOSITORY_ROOT / relative_path).read_bytes(),
         )
 
+    def test_self_study_camp_is_published_as_public_all_day_event(self) -> None:
+        uid = "AED38EB5-FB63-467D-9FBC-79AACF61A4AE"
+        relative_path = Path(
+            "public/2026/10/2026-10-08-self-study-check-in-camp.ics"
+        )
+        data = json.loads((self.output / "events-data.json").read_text(encoding="utf-8"))
+        target = next(event for event in data["events"] if event["uid"] == uid)
+        self.assertEqual(target["title"], "自习打卡营")
+        self.assertEqual(target["scope"], "public")
+        self.assertTrue(target["allDay"])
+        self.assertEqual(target["start"], "2026-10-08")
+        self.assertEqual(target["end"], "2026-11-09")
+        self.assertEqual(target["location"], "E14图书馆")
+        self.assertEqual(
+            (self.output / relative_path).read_bytes(),
+            (REPOSITORY_ROOT / relative_path).read_bytes(),
+        )
+        source = Calendar.from_ical((REPOSITORY_ROOT / relative_path).read_bytes())
+        source_event = source.walk("VEVENT")[0]
+        for feed in ("public.ics", "public/2026/10.ics", "BETA-SDC.ics"):
+            with self.subTest(feed=feed):
+                event = next(
+                    event
+                    for event in self.read_calendar(feed).walk("VEVENT")
+                    if str(event.get("UID")) == uid
+                )
+                self.assertEqual(event.to_ical(), source_event.to_ical())
+
     def test_event_properties_survive_aggregation(self) -> None:
         uid = "C8835A1E-C99B-4DE1-B5BB-67F8CCFECDA0"
         internal = self.read_calendar("internal.ics")
