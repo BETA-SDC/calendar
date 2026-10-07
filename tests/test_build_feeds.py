@@ -152,8 +152,8 @@ class BuildFeedsTest(unittest.TestCase):
         self.assertEqual(target["end"], "2026-11-09")
         self.assertEqual(
             target["location"],
-            "西湖大学云谷校区 E14 图书馆（杭州市墩余路600号） / "
-            "E14 Library, Yungu Campus, Westlake University, 600 Dunyu Road, Hangzhou",
+            "西湖大学云谷校区 E12 图书馆（杭州市墩余路600号） / "
+            "E12 Library, Yungu Campus, Westlake University, 600 Dunyu Road, Hangzhou",
         )
         self.assertEqual(
             (self.output / relative_path).read_bytes(),
