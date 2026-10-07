@@ -50,13 +50,22 @@ Current categories:
   party.
 - `internal`: internal events and meetings.
 
-Locations use the following convention:
+Calendar names, event summaries, locations (when supplied), and reminder
+descriptions must be bilingual, using `中文 / English` in the same field.
+Keep shared identifiers such as room numbers and URLs unchanged. For example:
 
 ```text
-云谷校区 H4-103
-云谷校区 H4-104
-云谷校区 H4-121
+自习打卡营 / Self-Study Check-in Camp
+云谷校区 / Yungu Campus H4-103
+云谷校区 / Yungu Campus H4-104
+云谷校区 / Yungu Campus H4-121
+提醒事项 / Reminder
 ```
+
+Use CRLF line endings and fold ICS content lines at 75 UTF-8 octets without
+splitting a character. When updating an event's text, increment `SEQUENCE`
+and update `DTSTAMP` and `LAST-MODIFIED`, preserving its `UID`, schedule,
+and reminder triggers.
 
 `H4-xxx` is the building/room identifier on Westlake University's Yungu
 Campus. Source files do not include Apple Maps coordinates unless they
@@ -121,6 +130,11 @@ Outlook. The subscription page also has a direct ICS download link:
 public downloads use the default filename `BETA.ics`, while internal and
 all-event downloads use `BETA-SDC.ics`. Do not download and import the
 file if you want automatic updates; use the subscription option instead.
+
+Public calendars are named `BETA 公开活动 / Public Events`, internal calendars
+are named `BETA-SDC 内部事件 / Internal Events`, and all-event calendars are
+named `BETA-SDC 全部活动 / All Events`. Year and month feeds append their period
+to the same bilingual name.
 
 Generated feeds preserve the event properties and subcomponents from the
 source ICS files, including reminders (`VALARM`) and attachments

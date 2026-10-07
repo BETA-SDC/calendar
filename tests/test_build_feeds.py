@@ -59,8 +59,13 @@ class BuildFeedsTest(unittest.TestCase):
     def test_top_level_feed_metadata(self) -> None:
         public = self.read_calendar("public.ics")
         internal = self.read_calendar("internal.ics")
-        self.assertEqual(str(public.get("X-WR-CALNAME")), "BETA")
-        self.assertEqual(str(internal.get("X-WR-CALNAME")), "BETA-SDC internal")
+        self.assertEqual(
+            str(public.get("X-WR-CALNAME")), "BETA 公开活动 / Public Events"
+        )
+        self.assertEqual(
+            str(internal.get("X-WR-CALNAME")),
+            "BETA-SDC 内部事件 / Internal Events",
+        )
         for calendar in (public, internal):
             self.assertEqual(str(calendar.get("REFRESH-INTERVAL")), "PT1H")
             self.assertEqual(str(calendar.get("X-PUBLISHED-TTL")), "PT1H")
@@ -78,7 +83,10 @@ class BuildFeedsTest(unittest.TestCase):
             self.assertTrue((self.output / filename).is_file(), filename)
 
         data = json.loads((self.output / "calendar-data.json").read_text(encoding="utf-8"))
-        self.assertEqual(data["feeds"]["public"]["title"], "公开活动（全部）")
+        self.assertEqual(
+            data["feeds"]["public"]["title"],
+            "公开活动 / Public Events（全部 / All）",
+        )
         self.assertEqual(
             data["feeds"]["public"]["webcal"],
             "webcal://beta-sdc.github.io/calendar/public.ics",
@@ -111,9 +119,9 @@ class BuildFeedsTest(unittest.TestCase):
             for event in events
             if event["uid"] == "13B7ECF2-A67B-4388-A043-1FCE2E6D578A"
         )
-        self.assertEqual(target["scopeLabel"], "公开活动")
+        self.assertEqual(target["scopeLabel"], "公开活动 / Public Events")
         self.assertEqual(target["date"], "2026-09-29")
-        self.assertEqual(target["location"], "云谷校区 H4-103")
+        self.assertEqual(target["location"], "云谷校区 / Yungu Campus H4-103")
         self.assertEqual(
             target["url"],
             "https://beta-sdc.github.io/calendar/public/2026/09/"
@@ -137,12 +145,12 @@ class BuildFeedsTest(unittest.TestCase):
         )
         data = json.loads((self.output / "events-data.json").read_text(encoding="utf-8"))
         target = next(event for event in data["events"] if event["uid"] == uid)
-        self.assertEqual(target["title"], "自习打卡营")
+        self.assertEqual(target["title"], "自习打卡营 / Self-Study Check-in Camp")
         self.assertEqual(target["scope"], "public")
         self.assertTrue(target["allDay"])
         self.assertEqual(target["start"], "2026-10-08")
         self.assertEqual(target["end"], "2026-11-09")
-        self.assertEqual(target["location"], "E14图书馆")
+        self.assertEqual(target["location"], "E14图书馆 / E14 Library")
         self.assertEqual(
             (self.output / relative_path).read_bytes(),
             (REPOSITORY_ROOT / relative_path).read_bytes(),
@@ -157,6 +165,49 @@ class BuildFeedsTest(unittest.TestCase):
                     if str(event.get("UID")) == uid
                 )
                 self.assertEqual(event.to_ical(), source_event.to_ical())
+
+    def assert_bilingual(self, value: str) -> None:
+        self.assertIn(" / ", value)
+        chinese, english = value.split(" / ", 1)
+        self.assertRegex(chinese, r"[\u4e00-\u9fff]")
+        self.assertRegex(english, r"[A-Za-z]")
+
+    def test_all_published_calendars_are_bilingual(self) -> None:
+        for path in self.output.rglob("*.ics"):
+            with self.subTest(path=path.relative_to(self.output)):
+                calendar = Calendar.from_ical(path.read_bytes())
+                self.assert_bilingual(str(calendar.get("X-WR-CALNAME", "")))
+                for event in calendar.walk("VEVENT"):
+                    self.assert_bilingual(str(event.get("SUMMARY", "")))
+                    if event.get("LOCATION"):
+                        self.assert_bilingual(str(event["LOCATION"]))
+                    if event.get("X-APPLE-STRUCTURED-LOCATION"):
+                        self.assert_bilingual(
+                            str(event["X-APPLE-STRUCTURED-LOCATION"].params["X-TITLE"])
+                        )
+                    for component in event.walk():
+                        if component.get("DESCRIPTION"):
+                            self.assert_bilingual(str(component["DESCRIPTION"]))
+
+        data = json.loads((self.output / "calendar-data.json").read_text(encoding="utf-8"))
+        for feed in data["feeds"].values():
+            self.assert_bilingual(feed["title"])
+        data = json.loads((self.output / "events-data.json").read_text(encoding="utf-8"))
+        for event in data["events"]:
+            self.assert_bilingual(event["title"])
+            self.assert_bilingual(event["scopeLabel"])
+            if event["location"]:
+                self.assert_bilingual(event["location"])
+
+    def test_source_ics_lines_use_crlf_and_fit_byte_limit(self) -> None:
+        for scope in ("public", "internal"):
+            for path in (REPOSITORY_ROOT / scope).rglob("*.ics"):
+                with self.subTest(path=path.relative_to(REPOSITORY_ROOT)):
+                    content = path.read_bytes()
+                    self.assertTrue(content.endswith(b"\r\n"))
+                    self.assertNotIn(b"\n", content.replace(b"\r\n", b""))
+                    for line in content.split(b"\r\n"):
+                        self.assertLessEqual(len(line), 75)
 
     def test_event_properties_survive_aggregation(self) -> None:
         uid = "C8835A1E-C99B-4DE1-B5BB-67F8CCFECDA0"

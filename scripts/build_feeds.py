@@ -16,7 +16,10 @@ from icalendar import Calendar
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 ROOT_CATEGORIES = ("public", "internal")
-SCOPE_LABELS = {"public": "公开活动", "internal": "内部事件"}
+SCOPE_LABELS = {
+    "public": "公开活动 / Public Events",
+    "internal": "内部事件 / Internal Events",
+}
 REFRESH_INTERVAL = "PT1H"
 BASE_URL = "https://beta-sdc.github.io/calendar"
 WEB_ASSETS = ("index.html", "events.html", "styles.css", "app.js", "events.js")
@@ -254,12 +257,13 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
         if not entries:
             continue
         label = SCOPE_LABELS[scope]
-        top_level_name = "BETA" if scope == "public" else f"BETA-SDC {scope}"
+        brand = "BETA" if scope == "public" else "BETA-SDC"
+        top_level_name = f"{brand} {label}"
         register_feed(
             output,
             feeds,
             key=scope,
-            title=f"{label}（全部）",
+            title=f"{label}（全部 / All）",
             relative_path=Path(f"{scope}.ics"),
             calendar_name=top_level_name,
             entries=entries,
@@ -272,7 +276,7 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
                 key=f"{scope}:{year}",
                 title=f"{label} {year}",
                 relative_path=Path(scope) / f"{year}.ics",
-                calendar_name=f"BETA-SDC {scope} {year}",
+                calendar_name=f"{top_level_name} {year}",
                 entries=year_entries,
             )
         for (year, month), month_entries in sorted(group_by_month(entries).items()):
@@ -282,7 +286,7 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
                 key=f"{scope}:{year}-{month}",
                 title=f"{label} {year}-{month}",
                 relative_path=Path(scope) / year / f"{month}.ics",
-                calendar_name=f"BETA-SDC {scope} {year}-{month}",
+                calendar_name=f"{top_level_name} {year}-{month}",
                 entries=month_entries,
             )
 
@@ -291,9 +295,9 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
             output,
             feeds,
             key="all",
-            title="全部活动",
+            title="全部活动 / All Events",
             relative_path=Path("BETA-SDC.ics"),
-            calendar_name="BETA-SDC",
+            calendar_name="BETA-SDC 全部活动 / All Events",
             entries=all_entries,
         )
         for year, year_entries in sorted(group_by_year(all_entries).items()):
@@ -301,9 +305,9 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
                 output,
                 feeds,
                 key=f"all:{year}",
-                title=f"全部活动 {year}",
+                title=f"全部活动 / All Events {year}",
                 relative_path=Path(f"{year}.ics"),
-                calendar_name=f"BETA-SDC {year}",
+                calendar_name=f"BETA-SDC 全部活动 / All Events {year}",
                 entries=year_entries,
             )
         for (year, month), month_entries in sorted(group_by_month(all_entries).items()):
@@ -311,9 +315,9 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
                 output,
                 feeds,
                 key=f"all:{year}-{month}",
-                title=f"全部活动 {year}-{month}",
+                title=f"全部活动 / All Events {year}-{month}",
                 relative_path=Path(year) / f"{month}.ics",
-                calendar_name=f"BETA-SDC {year}-{month}",
+                calendar_name=f"BETA-SDC 全部活动 / All Events {year}-{month}",
                 entries=month_entries,
             )
 
