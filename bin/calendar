@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+python_bin="${CALENDAR_PYTHON:-python3}"
+if [[ -x "$script_dir/../.venv-build/bin/python" ]]; then
+  python_bin="$script_dir/../.venv-build/bin/python"
+fi
+exec "$python_bin" "$script_dir/../scripts/calendar_cli.py" "$@"

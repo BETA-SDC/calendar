@@ -18,6 +18,8 @@ public/                       public one-event ICS sources
 internal/                     internal one-event ICS sources
 web/                          subscription page HTML, CSS, and JavaScript
 scripts/build_feeds.py        validation and feed/site generator
+scripts/calendar_cli.py       GNU-style AI calendar management CLI
+bin/calendar                  executable CLI entry point
 tests/test_build_feeds.py     feed and site regression tests
 outlook-subscription-guide/   Outlook-specific instructions and assets
 docs/                         operating guides for calendar links
@@ -154,6 +156,18 @@ automatically when their directories contain events.
 
 The source directory must match the event's `DTSTART` year and month.
 Every event must have a non-empty, repository-wide unique `UID`.
+
+For AI-assisted operations, use the GNU-style CLI:
+
+```bash
+./bin/calendar list --json
+./bin/calendar show <UID> --json
+./bin/calendar validate --json
+./bin/calendar build --json
+```
+
+The full command contract, JSON output format, safety rules, and add/update/
+delete examples are in [AI 操作日历 CLI](docs/ai-calendar-cli.md).
 
 ## Local verification
 
