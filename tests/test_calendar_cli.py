@@ -6,8 +6,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
+from icalendar import Alarm, Calendar, Event
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 CLI = REPOSITORY_ROOT / "scripts" / "calendar_cli.py"
@@ -95,6 +98,49 @@ class CalendarCliTest(unittest.TestCase):
         built = json.loads(self.run_cli("build", "-j").stdout)
         self.assertEqual(built["output"], "site")
         self.assertTrue((self.root / "site" / "internal.ics").is_file())
+
+    def test_import_preserves_event_properties(self) -> None:
+        source = self.root / "incoming.ics"
+        calendar = Calendar()
+        calendar.add("VERSION", "2.0")
+        event = Event()
+        event.add("UID", "IMPORT-TEST-UID")
+        event.add("SUMMARY", "骨干会议")
+        event.add("DTSTART", datetime(2026, 10, 20, 21, 30, tzinfo=ZoneInfo("Asia/Shanghai")))
+        event.add("DTEND", datetime(2026, 10, 20, 22, 30, tzinfo=ZoneInfo("Asia/Shanghai")))
+        event.add("LOCATION", "H4-103")
+        event.add("X-TEST-PROPERTY", "preserve-me")
+        alarm = Alarm()
+        alarm.add("ACTION", "DISPLAY")
+        alarm.add("DESCRIPTION", "提醒事项")
+        alarm.add("TRIGGER", timedelta(minutes=-10))
+        event.add_component(alarm)
+        calendar.add_component(event)
+        source.write_bytes(calendar.to_ical())
+
+        result = self.run_cli(
+            "import",
+            str(source),
+            "-s",
+            "internal",
+            "--title",
+            "骨干会议 / SDC Core Team Meeting",
+            "--location",
+            "云谷校区 / Yungu Campus H4-103",
+            "-j",
+        )
+        imported = json.loads(result.stdout)
+        target = self.root / imported["path"]
+        parsed = Calendar.from_ical(target.read_bytes())
+        imported_event = parsed.walk("VEVENT")[0]
+        self.assertEqual(str(imported_event["UID"]), "IMPORT-TEST-UID")
+        self.assertEqual(str(imported_event["X-TEST-PROPERTY"]), "preserve-me")
+        self.assertEqual(str(imported_event["SUMMARY"]), "骨干会议 / SDC Core Team Meeting")
+        self.assertEqual(str(imported_event["LOCATION"]), "云谷校区 / Yungu Campus H4-103")
+        self.assertEqual(
+            str(imported_event.walk("VALARM")[0]["DESCRIPTION"]),
+            "提醒事项 / Reminder",
+        )
 
 
 if __name__ == "__main__":

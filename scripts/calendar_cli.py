@@ -272,6 +272,80 @@ def command_add(args: argparse.Namespace) -> None:
     output({"action": "add", "path": path.relative_to(root).as_posix(), "uid": uid}, args.json)
 
 
+def command_import(args: argparse.Namespace) -> None:
+    root = args.root.resolve()
+    source = Path(args.source).expanduser().resolve()
+    if not source.is_file():
+        fail(f"ICS file not found: {source}")
+    calendar = Calendar.from_ical(source.read_bytes())
+    events = [component for component in calendar.walk() if component.name == "VEVENT"]
+    if len(events) != 1:
+        fail(f"{source}: expected exactly one VEVENT, found {len(events)}")
+    event = events[0]
+    uid = event_uid(event, source)
+    existing_by_uid = {
+        event_uid(entry.event, entry.path): entry.path
+        for entries in load_source_events(root).values()
+        for entry in entries
+    }
+    existing_path = existing_by_uid.get(uid)
+    if existing_path and not args.replace:
+        fail(
+            f"UID already exists at {existing_path.relative_to(root)}; "
+            "use --replace to update it"
+        )
+
+    title = args.title or str(event.get("SUMMARY", "")).strip()
+    if not title:
+        fail("imported event is missing SUMMARY; provide --title")
+    require_bilingual(title, "--title or imported SUMMARY")
+    if args.title:
+        event["SUMMARY"] = args.title
+
+    location = args.location
+    if location is not None:
+        require_bilingual(location, "--location")
+        event["LOCATION"] = location
+    elif event.get("LOCATION"):
+        require_bilingual(str(event["LOCATION"]).strip(), "imported LOCATION or --location")
+
+    for component in event.subcomponents:
+        if component.name == "VALARM" and component.get("DESCRIPTION"):
+            if " / " not in str(component["DESCRIPTION"]):
+                component["DESCRIPTION"] = "提醒事项 / Reminder"
+    if args.alarm_minutes is not None:
+        remove_alarms(event)
+        add_alarm(event, args.alarm_minutes)
+
+    brand = "BETA" if args.scope == "public" else "BETA-SDC"
+    calendar["X-WR-CALNAME"] = f"{brand} {SCOPE_LABELS[args.scope]}"
+    if not any(component.name == "VTIMEZONE" for component in calendar.walk()):
+        add_timezone(calendar)
+
+    start = event.decoded("DTSTART")
+    if existing_path:
+        target = existing_path
+        event["SEQUENCE"] = int(event.get("SEQUENCE", 0)) + 1
+        stamp = datetime.now(timezone.utc)
+        event["DTSTAMP"] = vDDDTypes(stamp)
+        event["LAST-MODIFIED"] = vDDDTypes(stamp)
+    else:
+        stem = validate_filename_stem(args.filename) if args.filename else slug_from_title(title)
+        target = event_path(args.scope, start, stem, root)
+    if target.exists() and target != existing_path:
+        fail(f"target file already exists: {target.relative_to(root)}")
+    write_calendar(target, calendar)
+    output(
+        {
+            "action": "replace" if existing_path else "import",
+            "path": target.relative_to(root).as_posix(),
+            "source": str(source),
+            "uid": uid,
+        },
+        args.json,
+    )
+
+
 def command_update(args: argparse.Namespace) -> None:
     root = args.root.resolve()
     path, calendar, event = resolve_event(args.identifier, root)
@@ -395,6 +469,16 @@ def parser() -> argparse.ArgumentParser:
     add_parser.add_argument("--uid")
     add_parser.add_argument("-f", "--filename", help="filename stem without .ics")
     add_parser.set_defaults(handler=command_add)
+
+    import_parser = subparsers.add_parser("import", parents=[common])
+    import_parser.add_argument("source", help="external .ics file to normalize and import")
+    import_parser.add_argument("-s", "--scope", choices=("public", "internal"), required=True)
+    import_parser.add_argument("--title", help="replace a non-bilingual imported SUMMARY")
+    import_parser.add_argument("--location", help="replace a non-bilingual imported LOCATION")
+    import_parser.add_argument("--alarm-minutes", type=int)
+    import_parser.add_argument("-f", "--filename", help="filename stem without .ics")
+    import_parser.add_argument("--replace", action="store_true")
+    import_parser.set_defaults(handler=command_import)
 
     update_parser = subparsers.add_parser("update", parents=[common])
     update_parser.add_argument("identifier")

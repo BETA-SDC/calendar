@@ -162,6 +162,7 @@ For AI-assisted operations, use the GNU-style CLI:
 ```bash
 ./bin/calendar list --json
 ./bin/calendar show <UID> --json
+./bin/calendar import /path/to/event.ics -s internal --json
 ./bin/calendar validate --json
 ./bin/calendar build --json
 ```

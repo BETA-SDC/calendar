@@ -18,12 +18,19 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
 
 ## AI 操作协议
 
+先判断输入类型：
+
+- 只有自然语言描述：使用 `add`，让 CLI 从参数生成规范 ICS。
+- 已经提供 `.ics` 文件：使用 `import`，让 CLI 保留原文件的事件内容和
+  UID，只补仓库要求的范围、双语字段和元数据。
+
 1. 先运行 `list --json`，确认已有事件和 UID。
-2. 需要修改或删除时，用 `show UID --json` 核对完整事件。
-3. 执行 `add`、`update` 或 `delete --yes`。
-4. 运行 `validate --json`。
-5. 需要检查聚合 feed 时运行 `build --json`。
-6. 查看 `git diff`，确认只修改了预期的 ICS 源文件，再提交。
+2. 对已有事件或准备导入的文件，用 `show UID --json` 或直接检查输入文件。
+3. 自然语言输入执行 `add`；ICS 输入执行 `import`。
+4. 需要修改或删除已有事件时，执行 `update` 或 `delete --yes`。
+5. 运行 `validate --json`。
+6. 需要检查聚合 feed 时运行 `build --json`。
+7. 查看 `git diff`，确认只修改了预期的 ICS 源文件，再提交。
 
 除非用户明确要求删除，AI 不得自动使用 `delete --yes`。修改已有事件时
 不要手工替换 UID；CLI 会保留 UID、递增 `SEQUENCE`，并更新
@@ -73,6 +80,41 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
   --title '开放日 / Open Day' \
   -j
 ```
+
+## 直接导入 ICS
+
+已有 ICS 时不要把整个事件重新展开成 `add` 参数。`import` 会解析输入、
+保留 `VEVENT` 的 UID、提醒、附件和 Apple 扩展字段，只规范化日历名称、
+提醒描述、目标路径和 CRLF/折行格式。
+
+如果输入文件已经是双语，最短命令是：
+
+```bash
+./bin/calendar import /path/to/event.ics -s internal -j
+```
+
+如果 SUMMARY 或 LOCATION 不是双语，只通过选项覆盖这两个字段：
+
+```bash
+./bin/calendar import /path/to/骨干会议.ics \
+  -s internal \
+  --title '骨干会议 / SDC Core Team Meeting' \
+  --location '云谷校区 / Yungu Campus H4-103' \
+  -j
+```
+
+导入默认拒绝仓库中已存在的 UID。确认输入是对已有事件的新版本时，使用
+`--replace`；CLI 会在原路径更新事件、递增 `SEQUENCE` 并更新时间戳：
+
+```bash
+./bin/calendar import /path/to/revised-event.ics \
+  -s internal \
+  --replace \
+  -j
+```
+
+`import` 不会自动猜测中文或英文翻译；缺少双语字段时，AI 只需通过
+`--title` 或 `--location` 提供规范值。
 
 更新事件：
 
