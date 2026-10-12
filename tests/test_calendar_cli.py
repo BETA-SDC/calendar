@@ -98,6 +98,49 @@ class CalendarCliTest(unittest.TestCase):
         built = json.loads(self.run_cli("build", "-j").stdout)
         self.assertEqual(built["output"], "site")
         self.assertTrue((self.root / "site" / "internal.ics").is_file())
+        self.run_cli("build", "--public-only", "-j")
+        self.assertFalse((self.root / "site" / "internal.ics").is_file())
+
+    def test_tentative_event_can_be_planned_without_changing_identity(self) -> None:
+        added = json.loads(self.run_cli(
+            "add", "-s", "public", "--status", "tentative",
+            "--start", "2026-10-20T20:00", "--end", "2026-10-20T21:00",
+            "--title", "待定讲座 / Tentative Talk", "-j",
+        ).stdout)
+        shown = json.loads(self.run_cli("show", added["uid"], "-j").stdout)
+        self.assertEqual(shown["status"], "tentative")
+        self.assertTrue(shown["requiresKey"])
+        tentative = json.loads(self.run_cli("list", "--status", "tentative", "-j").stdout)
+        self.assertEqual([event["uid"] for event in tentative], [added["uid"]])
+        self.run_cli("build", "--public-only")
+        self.assertFalse((self.root / "site" / added["path"]).exists())
+        self.run_cli("update", added["uid"], "--status", "planned")
+        shown = json.loads(self.run_cli("show", added["uid"], "-j").stdout)
+        self.assertEqual(shown["status"], "planned")
+        self.assertFalse(shown["requiresKey"])
+        event = Calendar.from_ical((self.root / added["path"]).read_bytes()).walk("VEVENT")[0]
+        self.assertEqual(str(event["STATUS"]), "CONFIRMED")
+        self.assertEqual(int(event["SEQUENCE"]), 1)
+        self.assertEqual(str(event["UID"]), added["uid"])
+        self.run_cli("build", "--public-only")
+        self.assertTrue((self.root / "site" / added["path"]).exists())
+
+    def test_import_preserves_or_overrides_tentative_status(self) -> None:
+        added = json.loads(self.run_cli(
+            "add", "-s", "internal", "--status", "tentative",
+            "--start", "2026-10-20", "--end", "2026-10-21",
+            "--title", "待定会议 / Tentative Meeting", "-j",
+        ).stdout)
+        source = self.root / "external.ics"
+        shutil.copy2(self.root / added["path"], source)
+        self.run_cli("delete", added["uid"], "--yes")
+        self.run_cli("import", str(source), "-s", "internal")
+        shown = json.loads(self.run_cli("show", added["uid"], "-j").stdout)
+        self.assertEqual(shown["status"], "tentative")
+        self.run_cli("import", str(source), "-s", "internal", "--replace", "--status", "planned")
+        shown = json.loads(self.run_cli("show", added["uid"], "-j").stdout)
+        self.assertEqual(shown["status"], "planned")
+        self.assertTrue(shown["requiresKey"])
 
     def test_import_preserves_event_properties(self) -> None:
         source = self.root / "incoming.ics"

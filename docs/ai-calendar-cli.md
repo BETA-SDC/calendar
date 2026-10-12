@@ -38,6 +38,27 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
 
 ## 常用命令
 
+事件有“可见范围”和“事件状态”两组标签。范围由 `-s public/internal`
+指定，状态由 `--status planned/tentative` 指定。`add` 默认为计划事件；
+`import` 默认保留原 ICS 状态，未标注状态的旧事件视为计划事件。
+`list/show --json` 返回 `status`、`statusLabel` 和 `requiresKey`。
+内部事件以及所有待定事件都标记为需要密钥。
+
+```bash
+./bin/calendar list -s public --status tentative --json
+./bin/calendar add -s public --status tentative \
+  --start 2026-11-01T14:00 --end 2026-11-01T16:00 \
+  --title '待定讲座 / Tentative Talk' --json
+./bin/calendar update UID --status planned --json
+./bin/calendar import /path/to/event.ics -s internal --status tentative --json
+```
+
+状态变更保留 UID，并递增 `SEQUENCE`、更新修改时间。
+`build` 默认生成全部事件，网页使用密码 `betasdc` 进行轻量拦截。
+如需从生成文件中排除内部和待定事件，使用 `build --public-only --json`。
+CLI 是本地管理工具，不验证网页密码。密码不会保护原始 JSON、ICS 链接
+或公开仓库源文件。参见[密码访问说明](key-access.md)。
+
 列出全部事件：
 
 ```bash

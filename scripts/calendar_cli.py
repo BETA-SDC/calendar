@@ -18,6 +18,8 @@ from icalendar import Alarm, Calendar, Event, vDDDTypes
 from build_feeds import (
     REPOSITORY_ROOT,
     SCOPE_LABELS,
+    STATUS_LABELS,
+    event_status,
     event_uid,
     load_source_events,
     serialize_event,
@@ -184,6 +186,9 @@ def source_event_data(path: Path, event: Any, root: Path) -> dict[str, Any]:
         "uid": event_uid(event, path),
         "scope": scope,
         "scopeLabel": SCOPE_LABELS[scope],
+        "status": event_status(event),
+        "statusLabel": STATUS_LABELS[event_status(event)],
+        "requiresKey": scope == "internal" or event_status(event) == "tentative",
         "title": str(event.get("SUMMARY", "")).strip(),
         "location": str(event.get("LOCATION", "")).strip(),
         "path": path.relative_to(root).as_posix(),
@@ -221,6 +226,8 @@ def command_list(args: argparse.Namespace) -> None:
         events = [item for item in events if item["date"] >= args.from_date]
     if args.to_date:
         events = [item for item in events if item["date"] <= args.to_date]
+    if args.status != "all":
+        events = [item for item in events if item["status"] == args.status]
     output(events, args.json)
 
 
@@ -259,6 +266,7 @@ def command_add(args: argparse.Namespace) -> None:
     event.add("CREATED", datetime.now(timezone.utc))
     event.add("SEQUENCE", 0)
     event.add("TRANSP", "OPAQUE")
+    event.add("STATUS", "TENTATIVE" if args.status == "tentative" else "CONFIRMED")
     if args.location:
         event.add("LOCATION", args.location)
     if args.alarm_minutes is not None:
@@ -282,6 +290,9 @@ def command_import(args: argparse.Namespace) -> None:
     if len(events) != 1:
         fail(f"{source}: expected exactly one VEVENT, found {len(events)}")
     event = events[0]
+    if args.status:
+        event["STATUS"] = "TENTATIVE" if args.status == "tentative" else "CONFIRMED"
+    event_status(event)
     uid = event_uid(event, source)
     existing_by_uid = {
         event_uid(entry.event, entry.path): entry.path
@@ -351,6 +362,9 @@ def command_update(args: argparse.Namespace) -> None:
     path, calendar, event = resolve_event(args.identifier, root)
     old_start = event.decoded("DTSTART")
     changed = False
+    if args.status:
+        event["STATUS"] = "TENTATIVE" if args.status == "tentative" else "CONFIRMED"
+        changed = True
     if args.title:
         require_bilingual(args.title, "--title")
         event["SUMMARY"] = args.title
@@ -431,7 +445,7 @@ def command_build(args: argparse.Namespace) -> None:
     from build_feeds import build_site
 
     root = args.root.resolve()
-    build_site(root, root / "site")
+    build_site(root, root / "site", include_restricted=not args.public_only)
     output({"action": "build", "output": str((root / "site").relative_to(root))}, args.json)
 
 
@@ -453,6 +467,7 @@ def parser() -> argparse.ArgumentParser:
     list_parser.add_argument("-s", "--scope", choices=("all", "public", "internal"), default="all")
     list_parser.add_argument("--from", dest="from_date")
     list_parser.add_argument("--to", dest="to_date")
+    list_parser.add_argument("--status", choices=("all", "planned", "tentative"), default="all")
     list_parser.set_defaults(handler=command_list)
 
     show_parser = subparsers.add_parser("show", parents=[common])
@@ -461,6 +476,7 @@ def parser() -> argparse.ArgumentParser:
 
     add_parser = subparsers.add_parser("add", parents=[common])
     add_parser.add_argument("-s", "--scope", choices=("public", "internal"), required=True)
+    add_parser.add_argument("--status", choices=tuple(STATUS_LABELS), default="planned")
     add_parser.add_argument("--start", required=True)
     add_parser.add_argument("--end", required=True)
     add_parser.add_argument("--title", required=True)
@@ -478,6 +494,7 @@ def parser() -> argparse.ArgumentParser:
     import_parser.add_argument("--alarm-minutes", type=int)
     import_parser.add_argument("-f", "--filename", help="filename stem without .ics")
     import_parser.add_argument("--replace", action="store_true")
+    import_parser.add_argument("--status", choices=tuple(STATUS_LABELS))
     import_parser.set_defaults(handler=command_import)
 
     update_parser = subparsers.add_parser("update", parents=[common])
@@ -486,6 +503,7 @@ def parser() -> argparse.ArgumentParser:
     update_parser.add_argument("--end")
     update_parser.add_argument("--title")
     update_parser.add_argument("--location")
+    update_parser.add_argument("--status", choices=tuple(STATUS_LABELS))
     alarm_group = update_parser.add_mutually_exclusive_group()
     alarm_group.add_argument("--alarm-minutes", type=int)
     alarm_group.add_argument("--clear-alarms", action="store_true")
@@ -500,6 +518,10 @@ def parser() -> argparse.ArgumentParser:
     validate_parser.set_defaults(handler=command_validate)
 
     build_parser = subparsers.add_parser("build", parents=[common])
+    build_parser.add_argument(
+        "--public-only", action="store_true",
+        help="exclude internal/tentative files from generated output",
+    )
     build_parser.set_defaults(handler=command_build)
     return cli
 

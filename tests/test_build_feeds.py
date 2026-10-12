@@ -21,7 +21,7 @@ class BuildFeedsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.output = Path(self.temporary_directory.name) / "site"
-        build_site(REPOSITORY_ROOT, self.output)
+        build_site(REPOSITORY_ROOT, self.output, include_restricted=True)
 
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
@@ -56,6 +56,62 @@ class BuildFeedsTest(unittest.TestCase):
         self.assertTrue(by_scope["public"])
         self.assertTrue(by_scope["internal"])
 
+    def test_public_build_excludes_restricted_data_everywhere(self) -> None:
+        root = Path(self.temporary_directory.name) / "sources"
+        start = datetime(2026, 10, 15, 20, tzinfo=ZoneInfo("Asia/Shanghai"))
+        for scope, uid, status in (
+            ("public", "public-planned", "CONFIRMED"),
+            ("public", "public-tentative", "TENTATIVE"),
+            ("internal", "internal-planned", "CONFIRMED"),
+            ("internal", "internal-tentative", "TENTATIVE"),
+        ):
+            relative = f"{scope}/2026/10/{uid}.ics"
+            self.write_source_event(root, relative, uid, start)
+            path = root / relative
+            calendar = Calendar.from_ical(path.read_bytes())
+            calendar.walk("VEVENT")[0]["STATUS"] = status
+            path.write_bytes(calendar.to_ical())
+
+        # Rebuilding over a full preview must also remove previously emitted private files.
+        build_site(root, self.output, REPOSITORY_ROOT / "web", include_restricted=True)
+        self.assertTrue((self.output / "internal.ics").exists())
+        build_site(root, self.output, REPOSITORY_ROOT / "web", include_restricted=False)
+        self.assertFalse((self.output / "internal").exists())
+        self.assertFalse((self.output / "internal.ics").exists())
+        data = json.loads((self.output / "events-data.json").read_text())
+        self.assertFalse(data["restrictedIncluded"])
+        self.assertEqual([event["uid"] for event in data["events"]], ["public-planned"])
+        self.assertEqual(data["events"][0]["status"], "planned")
+        self.assertFalse(data["events"][0]["requiresKey"])
+        for path in self.output.rglob("*"):
+            if path.suffix not in (".ics", ".json"):
+                continue
+            content = path.read_text()
+            for uid in ("public-tentative", "internal-planned", "internal-tentative"):
+                self.assertNotIn(uid, content, str(path))
+
+        build_site(root, self.output, REPOSITORY_ROOT / "web", include_restricted=True)
+        feeds = json.loads((self.output / "calendar-data.json").read_text())["feeds"]
+        for scope in ("public", "internal", "all"):
+            for status in ("planned", "tentative"):
+                for period in ("", ":2026", ":2026-10"):
+                    self.assertIn(f"{scope}@{status}{period}", feeds)
+        tentative = self.read_calendar("status/tentative/public.ics").walk("VEVENT")
+        self.assertEqual([str(event["UID"]) for event in tentative], ["public-tentative"])
+
+    def test_unknown_event_status_is_rejected(self) -> None:
+        root = Path(self.temporary_directory.name) / "invalid"
+        path = root / "public/2026/10/invalid.ics"
+        self.write_source_event(
+            root, "public/2026/10/invalid.ics", "invalid-status",
+            datetime(2026, 10, 15, tzinfo=ZoneInfo("Asia/Shanghai")),
+        )
+        calendar = Calendar.from_ical(path.read_bytes())
+        calendar.walk("VEVENT")[0]["STATUS"] = "TENTATVE"
+        path.write_bytes(calendar.to_ical())
+        with self.assertRaisesRegex(ValueError, "unsupported VEVENT STATUS"):
+            load_source_events(root)
+
     def test_top_level_feed_metadata(self) -> None:
         public = self.read_calendar("public.ics")
         internal = self.read_calendar("internal.ics")
@@ -75,6 +131,7 @@ class BuildFeedsTest(unittest.TestCase):
             "index.html",
             "events.html",
             "styles.css",
+            "access.js",
             "app.js",
             "events.js",
             "calendar-data.json",

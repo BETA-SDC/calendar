@@ -6,6 +6,7 @@
     <title>BETA 日历订阅</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="styles.css">
+    <script src="access.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -19,14 +20,31 @@
           <a class="page-link" href="events.html">单次添加活动</a>
         </nav>
       </header>
+      <form id="access-form" class="access-bar">
+        <div id="access-fields" class="access-fields">
+          <label for="access-password">访问密码</label>
+          <input id="access-password" type="password" autocomplete="current-password"
+            aria-describedby="access-message" required>
+          <button type="submit">解锁</button>
+        </div>
+        <button id="access-lock" type="button" hidden>锁定</button>
+        <p id="access-message" aria-live="polite"></p>
+      </form>
       <div class="layout">
         <section>
           <div class="controls">
-            <label>分类
+            <label>可见范围
               <select id="scope">
-                <option value="all">全部活动</option>
+                <option value="all">全部可访问活动</option>
                 <option value="public" selected>公开活动</option>
-                <option value="internal">内部事件</option>
+                <option value="internal">内部事件（需密码）</option>
+              </select>
+            </label>
+            <label>事件状态
+              <select id="planning-status">
+                <option value="all">全部状态</option>
+                <option value="planned" selected>计划事件</option>
+                <option value="tentative">待定事件（需密码）</option>
               </select>
             </label>
             <label>年份

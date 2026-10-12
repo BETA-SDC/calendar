@@ -46,11 +46,27 @@ The filename is for people; the `UID` inside the ICS file is the stable
 identity used by calendar applications. Keep the `UID` unchanged when
 editing an event.
 
-Current categories:
+Events have two independent labels. The source directory defines visibility:
 
 - `public`: public activities, including the Beta College autumn birthday
   party.
 - `internal`: internal events and meetings.
+
+The VEVENT `STATUS` defines planning state:
+
+- `planned`: `STATUS:CONFIRMED`, or no `STATUS` for existing events.
+- `tentative`: `STATUS:TENTATIVE`.
+
+`STATUS:CANCELLED` remains preserved and belongs to the planned category.
+An internal event or any tentative event requires the page access password
+`betasdc`. Both web pages filter by visibility and planning state, hide
+restricted events while locked, and share the unlock state within the current
+browser-tab session. The lock button clears that state.
+
+This is a lightweight frontend gate for non-sensitive information. Source
+files, generated JSON, and ICS subscription URLs remain publicly readable;
+the password is not server authentication. The CLI manages all events locally.
+See [密码访问说明](docs/key-access.md) for the behavior and limitations.
 
 Calendar names, event summaries, locations (when supplied), and reminder
 descriptions must be bilingual, using `中文 / English` in the same field.
@@ -87,7 +103,19 @@ internal/2026.ics            internal events in 2026
 2026/09.ics                  all events in September 2026
 public/2026/09.ics           public activities in September 2026
 internal/2026/09.ics         internal events in September 2026
+status/planned/public.ics    public planned events
+status/tentative/public.ics  public tentative events, when present
+status/planned/internal.ics  internal planned events
 ```
+
+Status feeds also have year/month paths such as
+`status/planned/public/2026.ics` and `status/planned/public/2026/09.ics`.
+Feed metadata keys use `public@planned`, `public@planned:2026`, and
+`public@planned:2026-09`. Selecting all statuses uses the legacy scope keys.
+The legacy public, internal, and all-event URLs remain stable.
+The locked page offers only public planned subscriptions; after unlocking,
+all scopes and states are available. The all-events selection means all
+currently accessible events.
 
 The generated files are deployed by the GitHub Actions Pages workflow
 from the `main` branch. They are not committed back into the repository.
@@ -132,6 +160,7 @@ Outlook. The subscription page also has a direct ICS download link:
 public downloads use the default filename `BETA.ics`, while internal and
 all-event downloads use `BETA-SDC.ics`. Do not download and import the
 file if you want automatic updates; use the subscription option instead.
+Subscription URLs themselves do not check the password.
 
 Public calendars are named `BETA 公开活动 / Public Events`, internal calendars
 are named `BETA-SDC 内部事件 / Internal Events`, and all-event calendars are
@@ -167,6 +196,11 @@ For AI-assisted operations, use the GNU-style CLI:
 ./bin/calendar build --json
 ```
 
+Create tentative events with `add --status tentative`, change their state
+with `update UID --status planned`, or filter with `list --status tentative`.
+`import --status tentative` overrides the imported state; omitting the option
+preserves it. Existing events default to planned without changing source files.
+
 The full command contract, JSON output format, safety rules, and add/update/
 delete examples are in [AI 操作日历 CLI](docs/ai-calendar-cli.md).
 
@@ -180,6 +214,11 @@ python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 python scripts/build_feeds.py --output site
 ```
+
+To omit internal and tentative events from every generated JSON and ICS file,
+run `python scripts/build_feeds.py --output site --public-only` or
+`./bin/calendar build --public-only`. The standard Pages build includes all
+events and uses the lightweight password gate.
 
 Serve `site/` over HTTP when checking the subscription page locally,
 because the page loads `calendar-data.json` with `fetch()`:

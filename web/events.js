@@ -2,6 +2,7 @@
 
 const elements = {
   scope: document.querySelector("#event-scope"),
+  planningStatus: document.querySelector("#event-planning-status"),
   year: document.querySelector("#event-year"),
   month: document.querySelector("#event-month"),
   status: document.querySelector("#event-status"),
@@ -24,6 +25,7 @@ const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
 });
 
 let events = [];
+let restrictedIncluded = false;
 
 function setOptions(select, options, selected) {
   const optionElements = options.map(([value, label]) => {
@@ -38,7 +40,9 @@ function setOptions(select, options, selected) {
 
 function eventsInScope() {
   return events.filter(
-    (event) => elements.scope.value === "all" || event.scope === elements.scope.value,
+    (event) => (elements.scope.value === "all" || event.scope === elements.scope.value)
+      && (elements.planningStatus.value === "all" || event.status === elements.planningStatus.value)
+      && (window.calendarAccess.isUnlocked() || !event.requiresKey),
   );
 }
 
@@ -115,7 +119,7 @@ function createEventRow(event) {
 
   const scope = document.createElement("p");
   scope.className = "event-scope";
-  scope.textContent = event.scopeLabel;
+  scope.textContent = `${event.scopeLabel} · ${event.statusLabel}`;
 
   const title = document.createElement("h4");
   title.textContent = event.title;
@@ -174,6 +178,14 @@ function renderEvents() {
   const visibleEvents = filteredEvents();
   elements.list.replaceChildren();
 
+  if ((!restrictedIncluded || !window.calendarAccess.isUnlocked())
+      && (elements.scope.value === "internal" || elements.planningStatus.value === "tentative")) {
+    elements.status.textContent = window.calendarAccess.isUnlocked()
+      ? "该部署未提供内部或待定事件。"
+      : "请输入访问密码以查看内部或待定事件。";
+    return;
+  }
+
   if (!visibleEvents.length) {
     elements.status.textContent = "当前范围暂无活动。";
     return;
@@ -204,7 +216,9 @@ function refresh() {
 }
 
 function bindEvents() {
+  window.addEventListener("calendar-access-change", refresh);
   elements.scope.addEventListener("change", refresh);
+  elements.planningStatus.addEventListener("change", refresh);
   elements.year.addEventListener("change", () => {
     refreshMonths();
     renderEvents();
@@ -217,7 +231,7 @@ async function initialize() {
   try {
     const response = await fetch("events-data.json", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    ({ events } = await response.json());
+    ({ events, restrictedIncluded = false } = await response.json());
     refresh();
   } catch (error) {
     elements.status.textContent = "活动数据加载失败，请稍后重试。";

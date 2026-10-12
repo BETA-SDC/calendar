@@ -2,6 +2,7 @@
 
 const elements = {
   scope: document.querySelector("#scope"),
+  planningStatus: document.querySelector("#planning-status"),
   year: document.querySelector("#year"),
   month: document.querySelector("#month"),
   period: document.querySelector("#period"),
@@ -20,15 +21,34 @@ const guidanceTemplate = document.querySelector(isApple ? "#apple-guidance" : "#
 
 let feeds = {};
 let periods = [];
+let restrictedIncluded = false;
+
+function restrictedSelection() {
+  return (!restrictedIncluded || !window.calendarAccess.isUnlocked())
+    && (elements.scope.value === "internal" || elements.planningStatus.value === "tentative");
+}
+
+function feedPrefix() {
+  const unlocked = window.calendarAccess.isUnlocked();
+  const scope = elements.scope.value === "all" && !unlocked
+    ? "public"
+    : elements.scope.value;
+  const status = elements.planningStatus.value === "all" && !unlocked
+    ? "planned"
+    : elements.planningStatus.value;
+  return status === "all"
+    ? scope
+    : `${scope}@${status}`;
+}
 
 function feedKey() {
   if (elements.year.value === "all" && elements.month.value === "all") {
-    return elements.scope.value;
+    return feedPrefix();
   }
   if (elements.year.value !== "all" && elements.month.value === "all") {
-    return `${elements.scope.value}:${elements.year.value}`;
+    return `${feedPrefix()}:${elements.year.value}`;
   }
-  return `${elements.scope.value}:${elements.year.value}-${elements.month.value}`;
+  return `${feedPrefix()}:${elements.year.value}-${elements.month.value}`;
 }
 
 function setOptions(select, options, selected) {
@@ -43,7 +63,7 @@ function setOptions(select, options, selected) {
 }
 
 function availablePeriods() {
-  const prefix = elements.scope.value === "all" ? "all:" : `${elements.scope.value}:`;
+  const prefix = `${feedPrefix()}:`;
   return periods.filter((item) => feeds[`${prefix}${item.year}-${item.month}`]);
 }
 
@@ -100,7 +120,7 @@ function showGuidance(available) {
 }
 
 function refreshLinks() {
-  const feed = feeds[feedKey()];
+  const feed = restrictedSelection() ? undefined : feeds[feedKey()];
   const available = Boolean(feed);
   setLinkState(elements.action, isApple && available ? feed.webcal : "#", available);
   setLinkState(elements.https, available ? feed.https : "#", available);
@@ -115,6 +135,12 @@ function refreshLinks() {
     ? `当前范围：${feed.title}`
     : "这个时间范围暂无事件";
   showGuidance(available);
+  if (restrictedSelection()) {
+    elements.status.textContent = window.calendarAccess.isUnlocked()
+      ? "该部署未提供内部或待定事件。"
+      : "请输入访问密码以查看内部或待定事件。";
+    elements.device.textContent = "当前范围尚未开放订阅。";
+  }
 }
 
 function refresh() {
@@ -125,6 +151,7 @@ function refresh() {
 }
 
 async function copySubscriptionUrl() {
+  if (restrictedSelection()) return;
   const feed = feeds[feedKey()];
   if (!feed) return;
   try {
@@ -136,7 +163,14 @@ async function copySubscriptionUrl() {
 }
 
 function bindEvents() {
+  window.addEventListener("calendar-access-change", refresh);
   elements.scope.addEventListener("change", refresh);
+  elements.planningStatus.addEventListener("change", refresh);
+  for (const link of [elements.action, elements.https, elements.download]) {
+    link.addEventListener("click", (event) => {
+      if (link.getAttribute("aria-disabled") === "true") event.preventDefault();
+    });
+  }
   elements.year.addEventListener("change", () => {
     refreshMonths();
     refreshPeriod();
@@ -156,6 +190,10 @@ function bindEvents() {
     refreshLinks();
   });
   elements.action.addEventListener("click", (event) => {
+    if (elements.action.getAttribute("aria-disabled") === "true") {
+      event.preventDefault();
+      return;
+    }
     if (isApple) return;
     event.preventDefault();
     copySubscriptionUrl();
@@ -169,7 +207,7 @@ async function initialize() {
   try {
     const response = await fetch("calendar-data.json", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    ({ feeds, periods } = await response.json());
+    ({ feeds, periods, restrictedIncluded = false } = await response.json());
     refresh();
   } catch (error) {
     elements.status.textContent = "日历数据加载失败，请稍后重试。";

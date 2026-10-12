@@ -20,9 +20,13 @@ SCOPE_LABELS = {
     "public": "公开活动 / Public Events",
     "internal": "内部事件 / Internal Events",
 }
+STATUS_LABELS = {
+    "planned": "计划事件 / Planned Events",
+    "tentative": "待定事件 / Tentative Events",
+}
 REFRESH_INTERVAL = "PT1H"
 BASE_URL = "https://beta-sdc.github.io/calendar"
-WEB_ASSETS = ("index.html", "events.html", "styles.css", "app.js", "events.js")
+WEB_ASSETS = ("index.html", "events.html", "styles.css", "access.js", "app.js", "events.js")
 
 
 @dataclass(frozen=True)
@@ -33,6 +37,21 @@ class SourceEvent:
     month: str
     event: Any
     timezones: tuple[Any, ...]
+
+    @property
+    def status(self) -> str:
+        return event_status(self.event)
+
+    @property
+    def requires_key(self) -> bool:
+        return self.scope == "internal" or self.status == "tentative"
+
+
+def event_status(event: Any) -> str:
+    status = str(event.get("STATUS", "CONFIRMED")).upper()
+    if status not in ("CONFIRMED", "TENTATIVE", "CANCELLED"):
+        raise ValueError(f"unsupported VEVENT STATUS: {status}")
+    return "tentative" if status == "TENTATIVE" else "planned"
 
 
 def read_event(path: Path) -> tuple[Calendar, Any]:
@@ -79,6 +98,7 @@ def load_source_events(source_root: Path) -> dict[str, list[SourceEvent]]:
                 raise ValueError(f"{path}: month must be between 01 and 12")
 
             calendar, event = read_event(path)
+            event_status(event)
             validate_event_period(event, path, year, month)
             uid = event_uid(event, path)
             if uid in uid_paths:
@@ -189,8 +209,10 @@ def write_calendar_data(
     output: Path,
     feeds: dict[str, dict[str, str]],
     periods: Iterable[tuple[str, str]],
+    include_restricted: bool = False,
 ) -> None:
     data = {
+        "restrictedIncluded": include_restricted,
         "feeds": feeds,
         "periods": [
             {"year": year, "month": month, "label": f"{year}-{month}"}
@@ -211,6 +233,9 @@ def serialize_event(entry: SourceEvent, source_root: Path) -> dict[str, Any]:
         "uid": event_uid(entry.event, entry.path),
         "scope": entry.scope,
         "scopeLabel": SCOPE_LABELS[entry.scope],
+        "status": entry.status,
+        "statusLabel": STATUS_LABELS[entry.status],
+        "requiresKey": entry.requires_key,
         "title": str(entry.event.get("SUMMARY", "")).strip(),
         "start": start.isoformat(),
         "end": end.isoformat() if end else None,
@@ -228,6 +253,7 @@ def write_event_data(
     output: Path,
     entries: Iterable[SourceEvent],
     source_root: Path,
+    include_restricted: bool = False,
 ) -> None:
     events = [
         serialize_event(entry, source_root)
@@ -237,18 +263,32 @@ def write_event_data(
         )
     ]
     (output / "events-data.json").write_text(
-        json.dumps({"events": events}, ensure_ascii=False, indent=2) + "\n",
+        json.dumps(
+            {"events": events, "restrictedIncluded": include_restricted},
+            ensure_ascii=False, indent=2,
+        ) + "\n",
         encoding="utf-8",
     )
 
 
-def build_site(source_root: Path, output: Path, web_root: Path | None = None) -> None:
+def build_site(
+    source_root: Path,
+    output: Path,
+    web_root: Path | None = None,
+    *,
+    include_restricted: bool = True,
+) -> None:
     web_root = web_root or source_root / "web"
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
 
     by_scope = load_source_events(source_root)
+    if not include_restricted:
+        by_scope = {
+            scope: [entry for entry in entries if not entry.requires_key]
+            for scope, entries in by_scope.items()
+        }
     feeds: dict[str, dict[str, str]] = {}
     all_entries = [entry for scope in ROOT_CATEGORIES for entry in by_scope[scope]]
 
@@ -321,17 +361,48 @@ def build_site(source_root: Path, output: Path, web_root: Path | None = None) ->
                 entries=month_entries,
             )
 
+    # The legacy feeds retain their URLs; new feeds support both independent labels.
+    for scope in (*ROOT_CATEGORIES, "all"):
+        scoped_entries = all_entries if scope == "all" else by_scope[scope]
+        for status, status_label in STATUS_LABELS.items():
+            entries = [entry for entry in scoped_entries if entry.status == status]
+            if not entries:
+                continue
+            label = SCOPE_LABELS.get(scope, "全部活动 / All Events")
+            name = f"BETA-SDC {label} · {status_label}"
+            prefix = f"{scope}@{status}"
+            base = Path("status") / status / scope
+            register_feed(
+                output, feeds, key=prefix, title=f"{label} · {status_label}",
+                relative_path=base.with_suffix(".ics"),
+                calendar_name=name, entries=entries,
+            )
+            for year, year_entries in sorted(group_by_year(entries).items()):
+                register_feed(
+                    output, feeds, key=f"{prefix}:{year}", title=f"{name} {year}",
+                    relative_path=base / f"{year}.ics",
+                    calendar_name=f"{name} {year}", entries=year_entries,
+                )
+            for (year, month), month_entries in sorted(group_by_month(entries).items()):
+                register_feed(
+                    output, feeds, key=f"{prefix}:{year}-{month}",
+                    title=f"{name} {year}-{month}",
+                    relative_path=base / year / f"{month}.ics",
+                    calendar_name=f"{name} {year}-{month}", entries=month_entries,
+                )
+
     copy_web_assets(output, web_root)
     copy_source_events(output, all_entries, source_root)
-    write_calendar_data(output, feeds, group_by_month(all_entries))
-    write_event_data(output, all_entries, source_root)
+    write_calendar_data(output, feeds, group_by_month(all_entries), include_restricted)
+    write_event_data(output, all_entries, source_root, include_restricted)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=Path("site"))
+    parser.add_argument("--public-only", action="store_true", help="exclude internal/tentative files")
     args = parser.parse_args()
-    build_site(REPOSITORY_ROOT, args.output)
+    build_site(REPOSITORY_ROOT, args.output, include_restricted=not args.public_only)
 
 
 if __name__ == "__main__":
