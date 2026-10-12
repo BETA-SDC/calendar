@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from icalendar import Alarm, Calendar, Event, vDDDTypes
 
 from build_feeds import (
+    BASE_URL,
     REPOSITORY_ROOT,
     SCOPE_LABELS,
     STATUS_LABELS,
@@ -36,6 +37,23 @@ def fail(message: str) -> None:
     raise SystemExit(f"error: {message}")
 
 
+def positive_integer(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected a positive integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("expected a positive integer")
+    return parsed
+
+
+def parse_date_argument(value: str) -> str:
+    try:
+        return date.fromisoformat(value).isoformat()
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected YYYY-MM-DD") from exc
+
+
 def require_bilingual(value: str, field: str) -> None:
     if " / " not in value:
         fail(f"{field} must use the bilingual format 中文 / English")
@@ -49,7 +67,7 @@ def parse_start(value: str) -> date | datetime:
     except ValueError as exc:
         fail(f"invalid date/time {value!r}; use YYYY-MM-DD or YYYY-MM-DDTHH:MM")
         raise AssertionError from exc
-    return parsed.replace(tzinfo=LOCAL_ZONE) if parsed.tzinfo is None else parsed
+    return parsed.replace(tzinfo=LOCAL_ZONE) if parsed.tzinfo is None else parsed.astimezone(LOCAL_ZONE)
 
 
 def parse_end(value: str, start: date | datetime) -> date | datetime:
@@ -64,7 +82,7 @@ def parse_end(value: str, start: date | datetime) -> date | datetime:
 
 def format_dt(value: date | datetime) -> str:
     if isinstance(value, datetime):
-        return value.isoformat(timespec="minutes")
+        return value.isoformat(timespec="seconds")
     return value.isoformat()
 
 
@@ -145,13 +163,22 @@ def remove_alarms(event: Any) -> None:
     ]
 
 
-def write_calendar(path: Path, calendar: Calendar) -> None:
+def write_calendar(path: Path, calendar: Calendar, *, dry_run: bool = False) -> None:
+    event = calendar.walk("VEVENT")[0]
+    start = event.decoded("DTSTART")
+    if event.get("DTEND"):
+        end = event.decoded("DTEND")
+        if isinstance(start, datetime) != isinstance(end, datetime):
+            fail("DTSTART and DTEND must both be dates or both be date/times")
+        if end <= start:
+            fail("DTEND must be later than DTSTART")
     data = calendar.to_ical().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
     lines = data.split(b"\r\n")
     if any(len(line) > 75 for line in lines):
         fail(f"generated ICS contains a line longer than 75 bytes: {path}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
+    if not dry_run:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
 
 
 def slug_from_title(title: str) -> str:
@@ -210,7 +237,7 @@ def output(value: Any, as_json: bool) -> None:
         print(json.dumps(value, ensure_ascii=False, indent=2))
 
 
-def command_list(args: argparse.Namespace) -> None:
+def query_events(args: argparse.Namespace) -> list[dict[str, Any]]:
     root = args.root.resolve()
     by_scope = load_source_events(root)
     entries = [
@@ -222,13 +249,155 @@ def command_list(args: argparse.Namespace) -> None:
     events = [serialize_event(entry, root) | {
         "path": entry.path.relative_to(root).as_posix()
     } for entry in entries]
-    if args.from_date:
-        events = [item for item in events if item["date"] >= args.from_date]
-    if args.to_date:
-        events = [item for item in events if item["date"] <= args.to_date]
+    if args.from_date and args.to_date and args.from_date > args.to_date:
+        fail("--from must not be later than --to")
+    if args.command == "agenda":
+        first = args.from_date or datetime.now(LOCAL_ZONE).date().isoformat()
+        last = args.to_date or (date.fromisoformat(first) + timedelta(days=args.days - 1)).isoformat()
+        if first > last:
+            fail("--from must not be later than --to")
+        window_start = datetime.combine(date.fromisoformat(first), datetime.min.time(), LOCAL_ZONE)
+        window_end = datetime.combine(
+            date.fromisoformat(last) + timedelta(days=1), datetime.min.time(), LOCAL_ZONE
+        )
+        def in_window(item: dict[str, Any]) -> bool:
+            start = parse_start(item["start"])
+            end = parse_start(item["end"]) if item["end"] else start
+            if not isinstance(start, datetime):
+                start = datetime.combine(start, datetime.min.time(), LOCAL_ZONE)
+                end = datetime.combine(end, datetime.min.time(), LOCAL_ZONE)
+                if not item["end"]:
+                    end += timedelta(days=1)
+            return start < window_end and (
+                end > window_start or (end == start and start >= window_start)
+            )
+        events = [item for item in events if in_window(item)]
+    else:
+        if args.from_date:
+            events = [item for item in events if item["date"] >= args.from_date]
+        if args.to_date:
+            events = [item for item in events if item["date"] <= args.to_date]
     if args.status != "all":
         events = [item for item in events if item["status"] == args.status]
-    output(events, args.json)
+    if args.query:
+        terms = args.query.casefold().split()
+        events = [
+            item for item in events
+            if all(term in " ".join(str(item[key]) for key in (
+                "uid", "title", "location", "path"
+            )).casefold() for term in terms)
+        ]
+    events.sort(key=lambda item: (parse_start(item["start"]).isoformat(), item["uid"]))
+    if args.limit is not None:
+        events = events[:args.limit]
+    return events
+
+
+def command_list(args: argparse.Namespace) -> None:
+    events = query_events(args)
+    if args.fields:
+        allowed = {
+            "uid", "scope", "scopeLabel", "status", "statusLabel", "requiresKey",
+            "title", "location", "path", "start", "end", "allDay", "date", "year",
+            "month", "url", "filename",
+        }
+        fields = args.fields.split(",")
+        if any(field not in allowed for field in fields):
+            fail("--fields contains an unknown field")
+        events = [{field: item[field] for field in fields} for item in events]
+        output(events, True)
+    else:
+        output(events, args.json)
+
+
+def command_inspect(args: argparse.Namespace) -> None:
+    source = Path(args.source).expanduser().resolve()
+    calendar = Calendar.from_ical(source.read_bytes())
+    existing = {
+        event_uid(entry.event, entry.path): entry.path.relative_to(args.root.resolve()).as_posix()
+        for entries in load_source_events(args.root.resolve()).values()
+        for entry in entries
+    }
+    results = []
+    for event in calendar.walk("VEVENT"):
+        uid = str(event.get("UID", "")).strip()
+        title = str(event.get("SUMMARY", "")).strip()
+        location = str(event.get("LOCATION", "")).strip()
+        start = event.decoded("DTSTART") if event.get("DTSTART") else None
+        end = event.decoded("DTEND") if event.get("DTEND") else None
+        issues = []
+        if not uid:
+            issues.append("missing UID")
+        if not start:
+            issues.append("missing DTSTART")
+        if " / " not in title:
+            issues.append("SUMMARY needs bilingual --title")
+        if location and " / " not in location:
+            issues.append("LOCATION needs bilingual --location")
+        if start and end:
+            if isinstance(start, datetime) != isinstance(end, datetime):
+                issues.append("DTSTART/DTEND types differ")
+            elif end <= start:
+                issues.append("DTEND must be later than DTSTART")
+        try:
+            status = event_status(event)
+        except ValueError as exc:
+            status = None
+            issues.append(str(exc))
+        results.append({
+            "uid": uid, "title": title, "location": location,
+            "start": format_dt(start) if start else None,
+            "end": format_dt(end) if end else None,
+            "status": status, "existingPath": existing.get(uid),
+            "issues": issues,
+            "alarms": len(event.walk("VALARM")),
+        })
+    output({
+        "source": str(source), "eventCount": len(results),
+        "singleEvent": len(results) == 1, "events": results,
+    }, args.json)
+
+
+def command_links(args: argparse.Namespace) -> None:
+    root = args.root.resolve()
+    path, _, event = resolve_event(args.identifier, root)
+    scope = path.relative_to(root).parts[0]
+    status = event_status(event)
+    start = event.decoded("DTSTART")
+    paths = {
+        "event": path.relative_to(root).as_posix(),
+        "scope": f"{scope}.ics",
+        "status": f"status/{status}/{scope}.ics",
+        "month": f"status/{status}/{scope}/{start.year:04d}/{start.month:02d}.ics",
+    }
+    output({
+        "uid": event_uid(event, path),
+        "requiresKey": scope == "internal" or status == "tentative",
+        "links": {
+            name: {"https": f"{BASE_URL}/{relative}", "webcal": f"{BASE_URL}/{relative}".replace("https://", "webcal://", 1)}
+            for name, relative in paths.items()
+        },
+    }, args.json)
+
+
+def command_shift(args: argparse.Namespace) -> None:
+    _, _, event = resolve_event(args.identifier, args.root.resolve())
+    start = event.decoded("DTSTART")
+    if any(event.get(key) for key in ("RRULE", "RDATE", "EXDATE", "RECURRENCE-ID")):
+        fail("shift does not support recurring events; use explicit update fields")
+    if not args.days and not args.minutes:
+        fail("shift requires nonzero --days or --minutes")
+    if not isinstance(start, datetime) and args.minutes:
+        fail("all-day events can only be shifted by whole days")
+    if not event.get("DTEND"):
+        fail("shift requires an explicit DTEND")
+    delta = timedelta(days=args.days, minutes=args.minutes)
+    updated = argparse.Namespace(
+        root=args.root, identifier=args.identifier, json=args.json, dry_run=args.dry_run,
+        start=format_dt(start + delta), end=format_dt(event.decoded("DTEND") + delta),
+        title=None, location=None, status=None, alarm_minutes=None, clear_alarms=False,
+    )
+    command_update(updated)
 
 
 def command_show(args: argparse.Namespace) -> None:
@@ -276,8 +445,9 @@ def command_add(args: argparse.Namespace) -> None:
     path = event_path(args.scope, start, stem, root)
     if path.exists():
         fail(f"target file already exists: {path.relative_to(root)}")
-    write_calendar(path, calendar)
-    output({"action": "add", "path": path.relative_to(root).as_posix(), "uid": uid}, args.json)
+    write_calendar(path, calendar, dry_run=args.dry_run)
+    output({"action": "add", "path": path.relative_to(root).as_posix(), "uid": uid,
+            "dryRun": args.dry_run, "event": source_event_data(path, event, root)}, args.json)
 
 
 def command_import(args: argparse.Namespace) -> None:
@@ -345,13 +515,15 @@ def command_import(args: argparse.Namespace) -> None:
         target = event_path(args.scope, start, stem, root)
     if target.exists() and target != existing_path:
         fail(f"target file already exists: {target.relative_to(root)}")
-    write_calendar(target, calendar)
+    write_calendar(target, calendar, dry_run=args.dry_run)
     output(
         {
             "action": "replace" if existing_path else "import",
             "path": target.relative_to(root).as_posix(),
             "source": str(source),
             "uid": uid,
+            "dryRun": args.dry_run,
+            "event": source_event_data(target, event, root),
         },
         args.json,
     )
@@ -378,6 +550,10 @@ def command_update(args: argparse.Namespace) -> None:
         event["DTSTART"] = vDDDTypes(new_start)
         if args.end:
             event["DTEND"] = vDDDTypes(parse_end(args.end, new_start))
+        elif isinstance(old_start, datetime) != isinstance(new_start, datetime):
+            fail("changing between all-day and timed events requires --end")
+        elif event.get("DTEND"):
+            event["DTEND"] = vDDDTypes(new_start + (event.decoded("DTEND") - old_start))
         changed = True
     elif args.end:
         current_start = old_start
@@ -407,8 +583,8 @@ def command_update(args: argparse.Namespace) -> None:
         )
     if target != path and target.exists():
         fail(f"target file already exists: {target.relative_to(root)}")
-    write_calendar(target, calendar)
-    if target != path:
+    write_calendar(target, calendar, dry_run=args.dry_run)
+    if target != path and not args.dry_run:
         path.unlink()
     output(
         {
@@ -417,6 +593,8 @@ def command_update(args: argparse.Namespace) -> None:
             "path": target.relative_to(root).as_posix(),
             "uid": event_uid(event, target),
             "sequence": int(event["SEQUENCE"]),
+            "dryRun": args.dry_run,
+            "event": source_event_data(target, event, root),
         },
         args.json,
     )
@@ -427,9 +605,11 @@ def command_delete(args: argparse.Namespace) -> None:
         fail("delete requires --yes")
     root = args.root.resolve()
     path, _, event = resolve_event(args.identifier, root)
-    path.unlink()
+    if not args.dry_run:
+        path.unlink()
     output(
-        {"action": "delete", "path": path.relative_to(root).as_posix(), "uid": event_uid(event, path)},
+        {"action": "delete", "path": path.relative_to(root).as_posix(), "uid": event_uid(event, path),
+         "dryRun": args.dry_run},
         args.json,
     )
 
@@ -452,8 +632,17 @@ def command_build(args: argparse.Namespace) -> None:
 def parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("-j", "--json", action="store_true", help="emit machine-readable JSON")
+    mutation = argparse.ArgumentParser(add_help=False, parents=[common])
+    mutation.add_argument("--dry-run", action="store_true", help="validate and preview without writing files")
+    filters = argparse.ArgumentParser(add_help=False, parents=[common])
+    filters.add_argument("-s", "--scope", choices=("all", "public", "internal"), default="all")
+    filters.add_argument("--from", dest="from_date", type=parse_date_argument)
+    filters.add_argument("--to", dest="to_date", type=parse_date_argument)
+    filters.add_argument("--status", choices=("all", "planned", "tentative"), default="all")
+    filters.add_argument("--limit", type=positive_integer)
+    filters.add_argument("--fields", help="comma-separated result fields (always emits JSON)")
     cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("--version", action="version", version="calendar-cli 1.0")
+    cli.add_argument("--version", action="version", version="calendar-cli 1.1")
     cli.add_argument("-v", "--verbose", action="store_true", help="enable verbose diagnostics")
     cli.add_argument(
         "--root",
@@ -463,18 +652,38 @@ def parser() -> argparse.ArgumentParser:
     )
     subparsers = cli.add_subparsers(dest="command", required=True)
 
-    list_parser = subparsers.add_parser("list", parents=[common])
-    list_parser.add_argument("-s", "--scope", choices=("all", "public", "internal"), default="all")
-    list_parser.add_argument("--from", dest="from_date")
-    list_parser.add_argument("--to", dest="to_date")
-    list_parser.add_argument("--status", choices=("all", "planned", "tentative"), default="all")
+    list_parser = subparsers.add_parser("list", parents=[filters], help="list and filter source events")
+    list_parser.add_argument("--query", help="case-insensitive keywords across title, location, UID and path")
     list_parser.set_defaults(handler=command_list)
+
+    search_parser = subparsers.add_parser("search", parents=[filters], help="search event text")
+    search_parser.add_argument("query", help="space-separated keywords; all must match")
+    search_parser.set_defaults(handler=command_list)
+
+    agenda_parser = subparsers.add_parser("agenda", parents=[filters], help="list events overlapping a date range")
+    agenda_parser.add_argument("--days", type=positive_integer, default=7, help="days from --from (default: 7)")
+    agenda_parser.add_argument("--query")
+    agenda_parser.set_defaults(handler=command_list)
+
+    inspect_parser = subparsers.add_parser("inspect", parents=[common], help="inspect an external ICS before importing")
+    inspect_parser.add_argument("source")
+    inspect_parser.set_defaults(handler=command_inspect)
+
+    links_parser = subparsers.add_parser("links", parents=[common], help="get event and subscription URLs")
+    links_parser.add_argument("identifier", help="UID, filename, or repository-relative path")
+    links_parser.set_defaults(handler=command_links)
+
+    shift_parser = subparsers.add_parser("shift", parents=[mutation], help="shift an event while preserving its duration")
+    shift_parser.add_argument("identifier")
+    shift_parser.add_argument("--days", type=int, default=0)
+    shift_parser.add_argument("--minutes", type=int, default=0)
+    shift_parser.set_defaults(handler=command_shift)
 
     show_parser = subparsers.add_parser("show", parents=[common])
     show_parser.add_argument("identifier", help="UID, filename, or repository-relative path")
     show_parser.set_defaults(handler=command_show)
 
-    add_parser = subparsers.add_parser("add", parents=[common])
+    add_parser = subparsers.add_parser("add", parents=[mutation])
     add_parser.add_argument("-s", "--scope", choices=("public", "internal"), required=True)
     add_parser.add_argument("--status", choices=tuple(STATUS_LABELS), default="planned")
     add_parser.add_argument("--start", required=True)
@@ -486,7 +695,7 @@ def parser() -> argparse.ArgumentParser:
     add_parser.add_argument("-f", "--filename", help="filename stem without .ics")
     add_parser.set_defaults(handler=command_add)
 
-    import_parser = subparsers.add_parser("import", parents=[common])
+    import_parser = subparsers.add_parser("import", parents=[mutation])
     import_parser.add_argument("source", help="external .ics file to normalize and import")
     import_parser.add_argument("-s", "--scope", choices=("public", "internal"), required=True)
     import_parser.add_argument("--title", help="replace a non-bilingual imported SUMMARY")
@@ -497,7 +706,7 @@ def parser() -> argparse.ArgumentParser:
     import_parser.add_argument("--status", choices=tuple(STATUS_LABELS))
     import_parser.set_defaults(handler=command_import)
 
-    update_parser = subparsers.add_parser("update", parents=[common])
+    update_parser = subparsers.add_parser("update", parents=[mutation])
     update_parser.add_argument("identifier")
     update_parser.add_argument("--start")
     update_parser.add_argument("--end")
@@ -509,7 +718,7 @@ def parser() -> argparse.ArgumentParser:
     alarm_group.add_argument("--clear-alarms", action="store_true")
     update_parser.set_defaults(handler=command_update)
 
-    delete_parser = subparsers.add_parser("delete", parents=[common])
+    delete_parser = subparsers.add_parser("delete", parents=[mutation])
     delete_parser.add_argument("identifier")
     delete_parser.add_argument("-y", "--yes", action="store_true")
     delete_parser.set_defaults(handler=command_delete)
@@ -530,7 +739,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     if args.verbose:
         print(f"calendar: command={args.command} root={args.root.resolve()}", file=sys.stderr)
-    args.handler(args)
+    if getattr(args, "alarm_minutes", None) is not None and args.alarm_minutes < 0:
+        fail("--alarm-minutes must be nonnegative")
+    try:
+        args.handler(args)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        fail(str(exc))
     return 0
 
 

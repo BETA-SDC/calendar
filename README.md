@@ -191,11 +191,23 @@ For AI-assisted operations, use the GNU-style CLI:
 
 ```bash
 ./bin/calendar list --json
+./bin/calendar search 'math help' --fields uid,title,start,path --limit 5
+./bin/calendar agenda --days 14 --json
 ./bin/calendar show <UID> --json
+./bin/calendar inspect /path/to/event.ics --json
 ./bin/calendar import /path/to/event.ics -s internal --json
+./bin/calendar shift <UID> --days 7 --dry-run --json
+./bin/calendar links <UID> --json
 ./bin/calendar validate --json
 ./bin/calendar build --json
 ```
+
+`list`, `search`, and `agenda` support scope/status/date filters, `--limit`,
+and JSON field selection with `--fields`. `agenda` includes ongoing events
+overlapping its date window. `inspect` diagnoses external ICS files and
+reports existing UIDs before import. Mutating commands support `--dry-run`
+for validation and previews without changing source files. Updating only
+the start time preserves the duration; `shift` moves both endpoints.
 
 Create tentative events with `add --status tentative`, change their state
 with `update UID --status planned`, or filter with `list --status tentative`.

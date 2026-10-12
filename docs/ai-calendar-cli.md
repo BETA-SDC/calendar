@@ -24,17 +24,102 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
 - 已经提供 `.ics` 文件：使用 `import`，让 CLI 保留原文件的事件内容和
   UID，只补仓库要求的范围、双语字段和元数据。
 
-1. 先运行 `list --json`，确认已有事件和 UID。
-2. 对已有事件或准备导入的文件，用 `show UID --json` 或直接检查输入文件。
+1. 用 `search '关键词' --json` 定位事件；需要全量清单时用 `list --json`。
+2. 对已有事件用 `show UID --json`；对外部文件先用 `inspect FILE --json`，
+   查看 UID 是否已存在、时间和需要补充的双语字段。
 3. 自然语言输入执行 `add`；ICS 输入执行 `import`。
 4. 需要修改或删除已有事件时，执行 `update` 或 `delete --yes`。
-5. 运行 `validate --json`。
+5. 不确定参数时，先用 `--dry-run --json` 预览；完成写入后运行 `validate --json`。
 6. 需要检查聚合 feed 时运行 `build --json`。
 7. 查看 `git diff`，确认只修改了预期的 ICS 源文件，再提交。
 
 除非用户明确要求删除，AI 不得自动使用 `delete --yes`。修改已有事件时
 不要手工替换 UID；CLI 会保留 UID、递增 `SEQUENCE`，并更新
 `DTSTAMP` 和 `LAST-MODIFIED`。
+
+## 高效查询与导入诊断
+
+按标题、地点、UID 或路径搜索，忽略英文大小写。空格分隔的关键词必须
+全部匹配；也可以给 `list` 添加 `--query`：
+
+```bash
+./bin/calendar search 'math help' --json
+./bin/calendar search 'H4-121' -s public --status planned \
+  --fields uid,title,start,path --limit 5
+```
+
+`list`、`search`、`agenda` 共享 `--scope`、`--status`、`--from`、
+`--to`、`--limit`、`--fields`。结果按开始时间排序。`--limit` 必须是正整数；
+`--fields` 接受逗号分隔的字段名，并始终输出 JSON。常用字段：
+`uid,title,start,end,location,path,scope,status,requiresKey,url`。
+完整字段与 `list --json` 一致。日期必须是 `YYYY-MM-DD`。
+`list/search` 的日期过滤按活动开始日期，包含两端。
+
+查看未来七天，或指定日程窗口：
+
+```bash
+./bin/calendar agenda --json
+./bin/calendar agenda --from 2026-10-12 --days 14 --fields uid,title,start,end
+./bin/calendar agenda --from 2026-10-12 --to 2026-10-31 --status tentative -j
+```
+
+`agenda` 默认从北京时间今天开始，共七天；`--to` 优先于 `--days`。
+它返回与窗口有交集的活动，包括之前开始、仍未结束的跨日活动。
+全天事件的结束日期不包含在活动内。查询依据源文件的 DTSTART/DTEND，
+不会展开 RRULE/RDATE 的重复实例。
+
+导入前诊断外部文件，不写入源文件：
+
+```bash
+./bin/calendar inspect '/path/to/event.ics' --json
+```
+
+返回 `eventCount`、`singleEvent` 和 `events`。每项包含 UID、标题、地点、
+时间、状态、提醒数量、`existingPath` 和 `issues`。
+`existingPath` 非空说明 UID 已存在；`issues` 列出缺失 UID/开始时间、
+需要双语覆盖的字段及无效时间范围等问题。多事件文件可以检查，但
+`import` 仍只接受恰好一个事件。检查结果包含问题时仍正常返回 JSON；
+读取或解析失败时非零退出。
+
+## 预览、改期与链接
+
+`add`、`import`、`update`、`shift`、`delete` 支持 `--dry-run`，
+执行同样的参数、UID、路径冲突及时间范围检查，但不创建、修改或删除源文件。
+返回 `dryRun: true`；增改和导入还返回拟写入的 `event`。
+新建预览中的随机 UID 不会保留到下一次调用；需要固定身份时给 `add`
+显式传入 `--uid`。删除预览仍需 `--yes`。
+
+```bash
+./bin/calendar import '/path/to/event.ics' -s public \
+  --status tentative --title '活动 / Event' --dry-run -j
+./bin/calendar update UID --start 2026-10-16T19:00 --dry-run -j
+```
+
+`update --start` 省略 `--end` 时自动保留原时长。定时与全天类型之间
+转换必须同时提供 `--end`。结束时间必须晚于开始时间。
+带时区偏移的输入会转换为 `Asia/Shanghai`，秒数会保留。
+
+整体前移或后移，保留 UID、时长、提醒和其他事件字段：
+
+```bash
+./bin/calendar shift UID --days 7 --dry-run -j
+./bin/calendar shift UID --days -1 --minutes 30 -j
+```
+
+`--days` 和 `--minutes` 可以为负数，但总参数不能都为零。
+全天活动只允许按整天移动。跨月/年会自动移动源文件，递增
+`SEQUENCE` 并更新时间戳。缺少 DTEND 或含重复规则/例外的活动不支持
+`shift`；重复活动需要明确编辑相关时间字段。
+
+一次获取活动下载/订阅链接、所属范围订阅、状态订阅和月份订阅：
+
+```bash
+./bin/calendar links UID --json
+```
+
+返回 `links.event/scope/status/month`，每项包含 `https` 与 `webcal`。
+这些地址按发布规则生成，不会联网检查部署状态。
+`requiresKey` 只表示网页是否需要解锁，不代表 ICS URL 有权限保护。
 
 ## 常用命令
 
