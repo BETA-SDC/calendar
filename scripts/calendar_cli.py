@@ -234,6 +234,8 @@ def source_event_data(path: Path, event: Any, root: Path) -> dict[str, Any]:
         "requiresKey": scope == "internal" or event_status(event) == "tentative",
         "title": str(event.get("SUMMARY", "")).strip(),
         "location": str(event.get("LOCATION", "")).strip(),
+        "description": str(event.get("DESCRIPTION", "")),
+        "sourceUrl": str(event.get("URL", "")),
         "path": path.relative_to(root).as_posix(),
         "start": format_dt(start),
         "end": format_dt(end) if end else None,
@@ -414,6 +416,7 @@ def command_shift(args: argparse.Namespace) -> None:
         start=format_dt(start + delta), end=format_dt(event.decoded("DTEND") + delta),
         title=None, location=None, status=None, alarm_minutes=None, clear_alarms=False,
         duration_minutes=None, duration_days=None,
+        description=None, url=None,
     )
     command_update(updated)
 
@@ -456,6 +459,10 @@ def command_add(args: argparse.Namespace) -> None:
     event.add("STATUS", "TENTATIVE" if args.status == "tentative" else "CONFIRMED")
     if args.location:
         event.add("LOCATION", args.location)
+    if args.description is not None:
+        event.add("DESCRIPTION", args.description)
+    if args.url is not None:
+        event.add("URL", args.url)
     if args.alarm_minutes is not None:
         add_alarm(event, args.alarm_minutes)
     calendar.add_component(event)
@@ -563,6 +570,11 @@ def command_update(args: argparse.Namespace) -> None:
         require_bilingual(args.location, "--location")
         event["LOCATION"] = args.location
         changed = True
+    for argument, property_name in (("description", "DESCRIPTION"), ("url", "URL")):
+        value = getattr(args, argument)
+        if value is not None:
+            event[property_name] = value
+            changed = True
     if args.start:
         new_start = parse_start(args.start)
         event["DTSTART"] = vDDDTypes(new_start)
@@ -731,6 +743,8 @@ def parser() -> argparse.ArgumentParser:
         add_schedule_options(add_parser, required=True)
         add_parser.add_argument("--title", required=True)
         add_parser.add_argument("--location")
+        add_parser.add_argument("--description", help="event notes, including unresolved details")
+        add_parser.add_argument("--url", help="source issue or event URL")
         add_parser.add_argument("--alarm-minutes", type=int)
         add_parser.add_argument("--uid")
         add_parser.add_argument("-f", "--filename", help="filename stem without .ics")
@@ -757,6 +771,8 @@ def parser() -> argparse.ArgumentParser:
         add_schedule_options(update_parser)
         update_parser.add_argument("--title")
         update_parser.add_argument("--location")
+        update_parser.add_argument("--description", help="replace event notes")
+        update_parser.add_argument("--url", help="replace source issue or event URL")
         if name == "update":
             update_parser.add_argument("--status", choices=tuple(STATUS_LABELS))
         else:

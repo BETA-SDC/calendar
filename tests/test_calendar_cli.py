@@ -74,6 +74,32 @@ class CalendarCliTest(unittest.TestCase):
         self.assertTrue(all_day["event"]["requiresKey"])
         self.run_cli("validate")
 
+    def test_tentative_notes_and_source_survive_confirmation(self) -> None:
+        notes = "仅确定下午，具体时段待确认。\n年份也需核实。 / Afternoon only; time and year to be confirmed."
+        source_url = "https://github.com/BETA-SDC/event-proposal/issues/58"
+        added = json.loads(self.run_cli(
+            "tentative", "-s", "public", "--start", "2026-11-11", "--days", "1",
+            "--title", "职业发展座谈会 / Career Development Roundtable",
+            "--filename", "test-notes-and-source",
+            "--description", notes, "--url", source_url, "-j",
+        ).stdout)
+        shown = json.loads(self.run_cli("show", added["uid"], "-j").stdout)
+        self.assertEqual(shown["description"], notes)
+        self.assertEqual(shown["sourceUrl"], source_url)
+        confirmed = json.loads(self.run_cli(
+            "confirm", added["uid"], "--start", "2026-11-11T14:00",
+            "--duration-minutes", "120", "-j",
+        ).stdout)
+        self.assertEqual(confirmed["event"]["description"], notes)
+        self.assertEqual(confirmed["event"]["sourceUrl"], source_url)
+        updated = json.loads(self.run_cli(
+            "update", added["uid"], "--description", "时间已确认 / Time confirmed",
+            "--url", "https://example.com/event", "-j",
+        ).stdout)
+        self.assertEqual(updated["event"]["description"], "时间已确认 / Time confirmed")
+        self.assertEqual(updated["event"]["sourceUrl"], "https://example.com/event")
+        self.run_cli("validate")
+
     def test_add_rejects_missing_conflicting_or_wrong_duration(self) -> None:
         before = self.source_snapshot()
         for arguments in (

@@ -44,6 +44,9 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
 但 `tentative` 固定写入 `STATUS:TENTATIVE`；`add` 默认写入
 `STATUS:CONFIRMED`，也保留原有 `--status tentative` 写法。
 范围必须明确指定 `-s public/internal`。
+`--description` 保存活动说明与待核实信息，`--url` 保存来源议题或活动链接；
+`show` 和增改返回的 `event` 会提供 `description`、`sourceUrl`。
+`confirm/update` 也可以更新这两个字段，省略时保留原值。
 
 定时日程可以提供开始时间和分钟时长，不必手动计算结束时间：
 
@@ -73,6 +76,12 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
   --title '生态合作（待定，时间未定） / Ecosystem Collaboration (Tentative, Time TBD)' \
   --start 2026-10-28T14:30 --duration-minutes 180 --dry-run -j
 ```
+
+只有“下午”而没有具体时段时，可以用用户提供的日期建立一天的占位项，
+在标题注明“下午，时间待定”，通过 `--description` 说明全天仅为占位、
+具体起止时间待确认，并通过 `--url` 保留依据。不要自行假设下午的起止时刻。
+落实时用 `confirm --start ... --duration-minutes ...` 转为定时日程，
+同时更新正式标题和说明。
 
 新增仍需要开始时间；如果日期尚未确定，AI 应先取得用户提供的暂存日期，
 不能自行把今天或其他日期当成正式安排。`tentative` 不从标题推断时间。
