@@ -39,6 +39,10 @@ function setOptions(select, options, selected) {
 }
 
 function eventsInScope() {
+  if (!window.calendarAccess.isUnlocked()
+      && window.calendarAccess.requiresPassword(elements.scope.value, elements.planningStatus.value)) {
+    return [];
+  }
   return events.filter(
     (event) => (elements.scope.value === "all" || event.scope === elements.scope.value)
       && (elements.planningStatus.value === "all" || event.status === elements.planningStatus.value)
@@ -178,11 +182,13 @@ function renderEvents() {
   const visibleEvents = filteredEvents();
   elements.list.replaceChildren();
 
-  if ((!restrictedIncluded || !window.calendarAccess.isUnlocked())
-      && (elements.scope.value === "internal" || elements.planningStatus.value === "tentative")) {
+  if ((!window.calendarAccess.isUnlocked()
+      && window.calendarAccess.requiresPassword(elements.scope.value, elements.planningStatus.value))
+      || (!restrictedIncluded
+        && (elements.scope.value === "internal" || elements.planningStatus.value === "tentative"))) {
     elements.status.textContent = window.calendarAccess.isUnlocked()
       ? "该部署未提供内部或待定事件。"
-      : "请输入访问密码以查看内部或待定事件。";
+      : "请输入访问密码以查看内部、待定或全部状态的事件。";
     return;
   }
 

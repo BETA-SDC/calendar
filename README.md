@@ -59,7 +59,8 @@ The VEVENT `STATUS` defines planning state:
 
 `STATUS:CANCELLED` remains preserved and belongs to the planned category.
 An internal event or any tentative event requires the page access password
-`betasdc`. Both web pages filter by visibility and planning state, hide
+`betasdc`. Selecting all planning states also requires the password, even
+for public events. Both web pages filter by visibility and planning state, hide
 restricted events while locked, and share the unlock state within the current
 browser-tab session. The lock button clears that state.
 

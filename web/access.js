@@ -12,6 +12,7 @@ try {
 
 window.calendarAccess = {
   isUnlocked: () => accessUnlocked,
+  requiresPassword: (scope, status) => scope === "internal" || status !== "planned",
 };
 
 const accessForm = document.querySelector("#access-form");
@@ -24,8 +25,8 @@ function renderAccess() {
   accessFields.hidden = accessUnlocked;
   accessLock.hidden = !accessUnlocked;
   accessMessage.textContent = accessUnlocked
-    ? "内部和待定事件已解锁。"
-    : "内部和待定事件需要访问密码。";
+    ? "内部、待定及全部状态已解锁。"
+    : "内部、待定及全部状态需要访问密码。";
 }
 
 function setAccess(unlocked) {

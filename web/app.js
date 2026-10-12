@@ -24,8 +24,10 @@ let periods = [];
 let restrictedIncluded = false;
 
 function restrictedSelection() {
-  return (!restrictedIncluded || !window.calendarAccess.isUnlocked())
-    && (elements.scope.value === "internal" || elements.planningStatus.value === "tentative");
+  return (!window.calendarAccess.isUnlocked()
+    && window.calendarAccess.requiresPassword(elements.scope.value, elements.planningStatus.value))
+    || (!restrictedIncluded
+    && (elements.scope.value === "internal" || elements.planningStatus.value === "tentative"));
 }
 
 function feedPrefix() {
@@ -33,9 +35,7 @@ function feedPrefix() {
   const scope = elements.scope.value === "all" && !unlocked
     ? "public"
     : elements.scope.value;
-  const status = elements.planningStatus.value === "all" && !unlocked
-    ? "planned"
-    : elements.planningStatus.value;
+  const status = elements.planningStatus.value;
   return status === "all"
     ? scope
     : `${scope}@${status}`;
@@ -63,6 +63,7 @@ function setOptions(select, options, selected) {
 }
 
 function availablePeriods() {
+  if (restrictedSelection()) return [];
   const prefix = `${feedPrefix()}:`;
   return periods.filter((item) => feeds[`${prefix}${item.year}-${item.month}`]);
 }
@@ -138,7 +139,7 @@ function refreshLinks() {
   if (restrictedSelection()) {
     elements.status.textContent = window.calendarAccess.isUnlocked()
       ? "该部署未提供内部或待定事件。"
-      : "请输入访问密码以查看内部或待定事件。";
+      : "请输入访问密码以查看内部、待定或全部状态的事件。";
     elements.device.textContent = "当前范围尚未开放订阅。";
   }
 }
