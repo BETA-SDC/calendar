@@ -102,6 +102,9 @@ class CalendarCliTest(unittest.TestCase):
         self.assertFalse((self.root / "site" / "internal.ics").is_file())
 
     def test_tentative_event_can_be_planned_without_changing_identity(self) -> None:
+        existing_tentative = json.loads(
+            self.run_cli("list", "--status", "tentative", "-j").stdout
+        )
         added = json.loads(self.run_cli(
             "add", "-s", "public", "--status", "tentative",
             "--start", "2026-10-20T20:00", "--end", "2026-10-20T21:00",
@@ -111,7 +114,10 @@ class CalendarCliTest(unittest.TestCase):
         self.assertEqual(shown["status"], "tentative")
         self.assertTrue(shown["requiresKey"])
         tentative = json.loads(self.run_cli("list", "--status", "tentative", "-j").stdout)
-        self.assertEqual([event["uid"] for event in tentative], [added["uid"]])
+        self.assertCountEqual(
+            [event["uid"] for event in tentative],
+            [event["uid"] for event in existing_tentative] + [added["uid"]],
+        )
         self.run_cli("build", "--public-only")
         self.assertFalse((self.root / "site" / added["path"]).exists())
         self.run_cli("update", added["uid"], "--status", "planned")
