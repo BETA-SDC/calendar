@@ -57,6 +57,115 @@ class CalendarCliTest(unittest.TestCase):
             for path in (self.root / scope).rglob("*.ics")
         }
 
+    def test_add_and_tentative_accept_durations(self) -> None:
+        timed = json.loads(self.run_cli(
+            "add", "-s", "public", "--start", "2026-12-31T23:30",
+            "--duration-minutes", "90", "--title", "跨年活动 / New Year Event", "-j",
+        ).stdout)
+        self.assertEqual(timed["event"]["end"], "2027-01-01T01:00:00+08:00")
+        self.assertEqual(timed["event"]["status"], "planned")
+        all_day = json.loads(self.run_cli(
+            "tentative", "-s", "internal", "--start", "2026-12-31",
+            "--days", "2", "--title", "候选活动 / Candidate Event", "-j",
+        ).stdout)
+        self.assertEqual(all_day["action"], "tentative")
+        self.assertEqual(all_day["event"]["end"], "2027-01-02")
+        self.assertEqual(all_day["event"]["status"], "tentative")
+        self.assertTrue(all_day["event"]["requiresKey"])
+        self.run_cli("validate")
+
+    def test_add_rejects_missing_conflicting_or_wrong_duration(self) -> None:
+        before = self.source_snapshot()
+        for arguments in (
+            (),
+            ("--duration-minutes", "0"),
+            ("--duration-minutes", "-10"),
+            ("--duration-minutes", "30", "--end", "2026-12-01T21:00"),
+            ("--days", "1"),
+            ("--start", "2026-12-01", "--duration-minutes", "30"),
+        ):
+            result = self.run_cli(
+                "add", "-s", "public", "--start", "2026-12-01T19:00",
+                "--title", "测试 / Test", *arguments, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(self.source_snapshot(), before)
+
+    def test_confirm_changes_schedule_and_status_in_one_revision(self) -> None:
+        added = self.add_event("--status", "tentative", "--alarm-minutes", "10")
+        path = self.root / added["path"]
+        calendar = Calendar.from_ical(path.read_bytes())
+        event = calendar.walk("VEVENT")[0]
+        event.add("ATTACH", "https://example.com/agenda.pdf")
+        event.add("X-TEST-PROPERTY", "preserve-me")
+        path.write_bytes(calendar.to_ical())
+        alarm = event.walk("VALARM")[0].to_ical()
+        result = json.loads(self.run_cli(
+            "confirm", added["uid"], "--start", "2027-01-05T18:30",
+            "--duration-minutes", "90", "--title", "正式活动 / Scheduled Event",
+            "--location", "云谷校区 / Yungu Campus H4-121", "-j",
+        ).stdout)
+        self.assertEqual(result["action"], "confirm")
+        self.assertEqual(result["sequence"], 1)
+        self.assertFalse(path.exists())
+        self.assertTrue(result["path"].startswith("public/2027/01/2027-01-05-"))
+        confirmed = Calendar.from_ical((self.root / result["path"]).read_bytes()).walk("VEVENT")[0]
+        self.assertEqual(str(confirmed["UID"]), added["uid"])
+        self.assertEqual(str(confirmed["STATUS"]), "CONFIRMED")
+        self.assertEqual(str(confirmed["ATTACH"]), "https://example.com/agenda.pdf")
+        self.assertEqual(str(confirmed["X-TEST-PROPERTY"]), "preserve-me")
+        self.assertEqual(confirmed.walk("VALARM")[0].to_ical(), alarm)
+        self.assertEqual(confirmed.decoded("CREATED"), event.decoded("CREATED"))
+        self.assertGreaterEqual(confirmed.decoded("LAST-MODIFIED"), event.decoded("LAST-MODIFIED"))
+        self.assertEqual(result["event"]["end"], "2027-01-05T20:00:00+08:00")
+        self.assertFalse(result["event"]["requiresKey"])
+        self.run_cli("build", "--public-only")
+        self.assertTrue((self.root / "site" / result["path"]).is_file())
+        before = self.source_snapshot()
+        self.assertNotEqual(self.run_cli("confirm", added["uid"], check=False).returncode, 0)
+        self.assertEqual(self.source_snapshot(), before)
+
+    def test_confirm_preserves_scope_and_existing_times(self) -> None:
+        added = self.add_event("-s", "internal", "--status", "tentative")
+        result = json.loads(self.run_cli("confirm", added["uid"], "-j").stdout)
+        self.assertEqual(result["event"]["scope"], "internal")
+        self.assertTrue(result["event"]["requiresKey"])
+        self.assertEqual(result["path"], added["path"])
+        self.assertEqual(result["event"]["start"], added["event"]["start"])
+        self.assertEqual(result["event"]["end"], added["event"]["end"])
+
+    def test_confirm_dry_run_invalid_ranges_and_collisions_do_not_write(self) -> None:
+        added = self.add_event("--status", "tentative")
+        self.add_event("--start", "2027-01-01T19:00", "--end", "2027-01-01T21:00")
+        before = self.source_snapshot()
+        preview = json.loads(self.run_cli(
+            "confirm", added["uid"], "--start", "2027-02-01T19:00",
+            "--duration-minutes", "60", "--dry-run", "-j",
+        ).stdout)
+        self.assertTrue(preview["dryRun"])
+        self.assertEqual(preview["event"]["status"], "planned")
+        self.assertEqual(self.source_snapshot(), before)
+        for arguments in (
+            ("--start", "2027-01-01T19:00"),
+            ("--end", "2026-12-01T18:00"),
+            ("--title", "单语标题"),
+            ("--days", "1"),
+        ):
+            self.assertNotEqual(self.run_cli("confirm", added["uid"], *arguments, check=False).returncode, 0)
+            self.assertEqual(self.source_snapshot(), before)
+
+    def test_confirm_all_day_can_become_timed_and_update_duration(self) -> None:
+        added = json.loads(self.run_cli(
+            "tentative", "-s", "public", "--start", "2026-12-01", "--days", "1",
+            "--title", "活动 / Event", "-j",
+        ).stdout)
+        result = json.loads(self.run_cli(
+            "confirm", added["uid"], "--start", "2026-12-02T19:00", "--duration-minutes", "120", "-j",
+        ).stdout)
+        self.assertEqual(result["event"]["end"], "2026-12-02T21:00:00+08:00")
+        updated = json.loads(self.run_cli("update", added["uid"], "--duration-minutes", "30", "-j").stdout)
+        self.assertEqual(updated["event"]["end"], "2026-12-02T19:30:00+08:00")
+
     def test_search_filters_projection_and_limits(self) -> None:
         added = self.add_event("--location", "测试室 / Test Room")
         found = json.loads(self.run_cli(

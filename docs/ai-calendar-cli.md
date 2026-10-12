@@ -20,15 +20,16 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
 
 先判断输入类型：
 
-- 只有自然语言描述：使用 `add`，让 CLI 从参数生成规范 ICS。
+- 只有自然语言描述：正式日程使用 `add`，待定事项使用 `tentative`，
+  让 CLI 从参数生成规范 ICS。
 - 已经提供 `.ics` 文件：使用 `import`，让 CLI 保留原文件的事件内容和
   UID，只补仓库要求的范围、双语字段和元数据。
 
 1. 用 `search '关键词' --json` 定位事件；需要全量清单时用 `list --json`。
 2. 对已有事件用 `show UID --json`；对外部文件先用 `inspect FILE --json`，
    查看 UID 是否已存在、时间和需要补充的双语字段。
-3. 自然语言输入执行 `add`；ICS 输入执行 `import`。
-4. 需要修改或删除已有事件时，执行 `update` 或 `delete --yes`。
+3. 自然语言输入执行 `add/tentative`；ICS 输入执行 `import`。
+4. 待定事项落实后用 `confirm UID`，其他修改用 `update`，删除用 `delete --yes`。
 5. 不确定参数时，先用 `--dry-run --json` 预览；完成写入后运行 `validate --json`。
 6. 需要检查聚合 feed 时运行 `build --json`。
 7. 查看 `git diff`，确认只修改了预期的 ICS 源文件，再提交。
@@ -36,6 +37,72 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
 除非用户明确要求删除，AI 不得自动使用 `delete --yes`。修改已有事件时
 不要手工替换 UID；CLI 会保留 UID、递增 `SEQUENCE`，并更新
 `DTSTAMP` 和 `LAST-MODIFIED`。
+
+## 新增日程与待定事项确认
+
+正式日程用 `add`，新增待定事项用 `tentative`。两者参数相同，
+但 `tentative` 固定写入 `STATUS:TENTATIVE`；`add` 默认写入
+`STATUS:CONFIRMED`，也保留原有 `--status tentative` 写法。
+范围必须明确指定 `-s public/internal`。
+
+定时日程可以提供开始时间和分钟时长，不必手动计算结束时间：
+
+```bash
+./bin/calendar add -s public \
+  --title '数学答疑室 第5期 / Math Help Room #5' \
+  --start 2026-10-21T19:00 --duration-minutes 120 \
+  --location '云谷校区 / Yungu Campus H4-121' --alarm-minutes 10 -j
+```
+
+全天日程提供开始日期与持续天数，结束日期自动按 ICS 排他规则计算：
+
+```bash
+./bin/calendar add -s public --title '开放日 / Open Day' \
+  --start 2026-11-01 --days 1 -j
+```
+
+每次新增必须选择 `--end`、`--duration-minutes` 或 `--days` 中的一项，
+三者互斥；时长和天数必须是正整数。
+`--duration-minutes` 只适用于定时活动，`--days` 只适用于全天活动。
+跨日、跨月、跨年的结束时间自动计算。
+
+创建待定事项：
+
+```bash
+./bin/calendar tentative -s public \
+  --title '生态合作（待定，时间未定） / Ecosystem Collaboration (Tentative, Time TBD)' \
+  --start 2026-10-28T14:30 --duration-minutes 180 --dry-run -j
+```
+
+新增仍需要开始时间；如果日期尚未确定，AI 应先取得用户提供的暂存日期，
+不能自行把今天或其他日期当成正式安排。`tentative` 不从标题推断时间。
+ICS 输入继续用 `import FILE -s public --status tentative`，保留原 UID。
+
+待定事项落实后，一次设置正式标题、时间、地点并转换状态：
+
+```bash
+./bin/calendar search '生态合作' --status tentative --fields uid,title,start,end
+./bin/calendar confirm UID \
+  --title '生态合作 / Ecosystem Collaboration' \
+  --start 2026-11-05T14:00 --duration-minutes 120 \
+  --location '云谷校区 / Yungu Campus H4-121' --dry-run -j
+```
+
+确认参数后去掉 `--dry-run` 即可写入。`confirm`：
+
+- 只接受现有待定事项，计划事项继续使用 `update`。
+- 一次写入正式字段与 `STATUS:CONFIRMED`，只递增一次 `SEQUENCE`。
+- 保留 UID、CREATED、附件、扩展字段和提醒；提醒选项可显式覆盖。
+- 保持 public/internal 范围，跨月/年自动移动源文件，更新时间戳。
+- 参数不合法或目标文件冲突时，不写入；`--dry-run` 也不写入。
+- 未提供的新字段沿用原值，包括时间和标题。标题中的“待定”“时间未定”
+  不会自动删改，正式标题应通过 `--title` 显式提供。
+
+若用户明确确认原暂存时间，仅需 `confirm UID -j`；若只提供新的
+开始时间，自动保留原时长。需要更改时长时使用 `--end`、
+`--duration-minutes` 或 `--days`。这些结束选项同样适用于 `update`，
+不提供 `--start` 时从已有开始时间计算。
+公开待定事项确认后可进入公开计划 feed；内部事项确认后仍为内部事件。
 
 ## 高效查询与导入诊断
 
@@ -83,11 +150,11 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
 
 ## 预览、改期与链接
 
-`add`、`import`、`update`、`shift`、`delete` 支持 `--dry-run`，
+`add`、`tentative`、`confirm`、`import`、`update`、`shift`、`delete` 支持 `--dry-run`，
 执行同样的参数、UID、路径冲突及时间范围检查，但不创建、修改或删除源文件。
 返回 `dryRun: true`；增改和导入还返回拟写入的 `event`。
 新建预览中的随机 UID 不会保留到下一次调用；需要固定身份时给 `add`
-显式传入 `--uid`。删除预览仍需 `--yes`。
+显式传入 `--uid`（`tentative` 同样支持）。删除预览仍需 `--yes`。
 
 ```bash
 ./bin/calendar import '/path/to/event.ics' -s public \
@@ -96,7 +163,7 @@ ICS 文件。AI 应通过 CLI 修改这些源文件，不要直接编辑 `site/`
 ```
 
 `update --start` 省略 `--end` 时自动保留原时长。定时与全天类型之间
-转换必须同时提供 `--end`。结束时间必须晚于开始时间。
+转换必须同时提供 `--end` 或适合目标类型的时长参数。结束时间必须晚于开始时间。
 带时区偏移的输入会转换为 `Asia/Shanghai`，秒数会保留。
 
 整体前移或后移，保留 UID、时长、提醒和其他事件字段：
@@ -163,7 +230,8 @@ CLI 是本地管理工具，不验证网页密码。密码不会保护原始 JSO
 ```
 
 新增定时事件。标题和地点必须使用 `中文 / English` 格式；时间使用
-`Asia/Shanghai`，格式为 `YYYY-MM-DDTHH:MM`。`--end` 必须显式提供：
+`Asia/Shanghai`，格式为 `YYYY-MM-DDTHH:MM`。提供 `--end` 或
+`--duration-minutes`：
 
 ```bash
 ./bin/calendar add \

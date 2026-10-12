@@ -190,6 +190,12 @@ Every event must have a non-empty, repository-wide unique `UID`.
 For AI-assisted operations, use the GNU-style CLI:
 
 ```bash
+./bin/calendar add -s public --title '活动 / Event' \
+  --start 2026-11-01T14:00 --duration-minutes 120 --json
+./bin/calendar tentative -s public --title '候选活动 / Candidate Event' \
+  --start 2026-11-02 --days 1 --json
+./bin/calendar confirm <UID> --start 2026-11-03T14:00 \
+  --duration-minutes 120 --title '正式活动 / Scheduled Event' --dry-run --json
 ./bin/calendar list --json
 ./bin/calendar search 'math help' --fields uid,title,start,path --limit 5
 ./bin/calendar agenda --days 14 --json
@@ -209,8 +215,14 @@ reports existing UIDs before import. Mutating commands support `--dry-run`
 for validation and previews without changing source files. Updating only
 the start time preserves the duration; `shift` moves both endpoints.
 
-Create tentative events with `add --status tentative`, change their state
-with `update UID --status planned`, or filter with `list --status tentative`.
+Create events with an explicit `--end`, timed `--duration-minutes`, or all-day
+`--days`. Use `tentative` to create candidate events and `confirm UID` to set
+their final fields and transition to planned in one write, preserving the UID,
+reminders, attachments, and scope. Omitted fields retain their existing values;
+provide `--title` to replace tentative wording and explicit times when the
+stored schedule was a placeholder.
+The existing `add --status tentative` and `update UID --status planned` commands
+remain available. Filter candidates with `list --status tentative`.
 `import --status tentative` overrides the imported state; omitting the option
 preserves it. Existing events default to planned without changing source files.
 

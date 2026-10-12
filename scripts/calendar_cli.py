@@ -80,6 +80,22 @@ def parse_end(value: str, start: date | datetime) -> date | datetime:
     return end
 
 
+def schedule_end(
+    args: argparse.Namespace, start: date | datetime
+) -> date | datetime | None:
+    if args.end:
+        return parse_end(args.end, start)
+    if args.duration_minutes is not None:
+        if not isinstance(start, datetime):
+            fail("--duration-minutes requires a timed --start; use --days for all-day events")
+        return start + timedelta(minutes=args.duration_minutes)
+    if args.duration_days is not None:
+        if isinstance(start, datetime):
+            fail("--days requires a date-only --start; use --duration-minutes for timed events")
+        return start + timedelta(days=args.duration_days)
+    return None
+
+
 def format_dt(value: date | datetime) -> str:
     if isinstance(value, datetime):
         return value.isoformat(timespec="seconds")
@@ -394,8 +410,10 @@ def command_shift(args: argparse.Namespace) -> None:
     delta = timedelta(days=args.days, minutes=args.minutes)
     updated = argparse.Namespace(
         root=args.root, identifier=args.identifier, json=args.json, dry_run=args.dry_run,
+        command="shift",
         start=format_dt(start + delta), end=format_dt(event.decoded("DTEND") + delta),
         title=None, location=None, status=None, alarm_minutes=None, clear_alarms=False,
+        duration_minutes=None, duration_days=None,
     )
     command_update(updated)
 
@@ -411,7 +429,7 @@ def command_add(args: argparse.Namespace) -> None:
     if args.location:
         require_bilingual(args.location, "--location")
     start = parse_start(args.start)
-    end = parse_end(args.end, start)
+    end = schedule_end(args, start)
     uid = args.uid or str(uuid.uuid4()).upper()
     root = args.root.resolve()
     existing = {event_uid(entry.event, entry.path) for entries in load_source_events(root).values() for entry in entries}
@@ -446,7 +464,7 @@ def command_add(args: argparse.Namespace) -> None:
     if path.exists():
         fail(f"target file already exists: {path.relative_to(root)}")
     write_calendar(path, calendar, dry_run=args.dry_run)
-    output({"action": "add", "path": path.relative_to(root).as_posix(), "uid": uid,
+    output({"action": args.command, "path": path.relative_to(root).as_posix(), "uid": uid,
             "dryRun": args.dry_run, "event": source_event_data(path, event, root)}, args.json)
 
 
@@ -548,17 +566,19 @@ def command_update(args: argparse.Namespace) -> None:
     if args.start:
         new_start = parse_start(args.start)
         event["DTSTART"] = vDDDTypes(new_start)
-        if args.end:
-            event["DTEND"] = vDDDTypes(parse_end(args.end, new_start))
+        new_end = schedule_end(args, new_start)
+        if new_end is not None:
+            event["DTEND"] = vDDDTypes(new_end)
         elif isinstance(old_start, datetime) != isinstance(new_start, datetime):
-            fail("changing between all-day and timed events requires --end")
+            fail("changing between all-day and timed events requires --end or a duration")
         elif event.get("DTEND"):
             event["DTEND"] = vDDDTypes(new_start + (event.decoded("DTEND") - old_start))
         changed = True
-    elif args.end:
-        current_start = old_start
-        event["DTEND"] = vDDDTypes(parse_end(args.end, current_start))
-        changed = True
+    else:
+        new_end = schedule_end(args, old_start)
+        if new_end is not None:
+            event["DTEND"] = vDDDTypes(new_end)
+            changed = True
     if args.alarm_minutes is not None:
         remove_alarms(event)
         add_alarm(event, args.alarm_minutes)
@@ -588,7 +608,7 @@ def command_update(args: argparse.Namespace) -> None:
         path.unlink()
     output(
         {
-            "action": "update",
+            "action": "confirm" if args.command == "confirm" else "update",
             "old_path": path.relative_to(root).as_posix(),
             "path": target.relative_to(root).as_posix(),
             "uid": event_uid(event, target),
@@ -598,6 +618,13 @@ def command_update(args: argparse.Namespace) -> None:
         },
         args.json,
     )
+
+
+def command_confirm(args: argparse.Namespace) -> None:
+    _, _, event = resolve_event(args.identifier, args.root.resolve())
+    if event_status(event) != "tentative":
+        fail("confirm requires a tentative event; use update for an existing planned event")
+    command_update(args)
 
 
 def command_delete(args: argparse.Namespace) -> None:
@@ -629,6 +656,13 @@ def command_build(args: argparse.Namespace) -> None:
     output({"action": "build", "output": str((root / "site").relative_to(root))}, args.json)
 
 
+def add_schedule_options(cli: argparse.ArgumentParser, *, required: bool = False) -> None:
+    ending = cli.add_mutually_exclusive_group(required=required)
+    ending.add_argument("--end", help="exclusive end date or end date/time")
+    ending.add_argument("--duration-minutes", type=positive_integer, help="duration of a timed event")
+    ending.add_argument("--days", dest="duration_days", type=positive_integer, help="duration of an all-day event")
+
+
 def parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("-j", "--json", action="store_true", help="emit machine-readable JSON")
@@ -642,7 +676,7 @@ def parser() -> argparse.ArgumentParser:
     filters.add_argument("--limit", type=positive_integer)
     filters.add_argument("--fields", help="comma-separated result fields (always emits JSON)")
     cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("--version", action="version", version="calendar-cli 1.1")
+    cli.add_argument("--version", action="version", version="calendar-cli 1.2")
     cli.add_argument("-v", "--verbose", action="store_true", help="enable verbose diagnostics")
     cli.add_argument(
         "--root",
@@ -683,17 +717,24 @@ def parser() -> argparse.ArgumentParser:
     show_parser.add_argument("identifier", help="UID, filename, or repository-relative path")
     show_parser.set_defaults(handler=command_show)
 
-    add_parser = subparsers.add_parser("add", parents=[mutation])
-    add_parser.add_argument("-s", "--scope", choices=("public", "internal"), required=True)
-    add_parser.add_argument("--status", choices=tuple(STATUS_LABELS), default="planned")
-    add_parser.add_argument("--start", required=True)
-    add_parser.add_argument("--end", required=True)
-    add_parser.add_argument("--title", required=True)
-    add_parser.add_argument("--location")
-    add_parser.add_argument("--alarm-minutes", type=int)
-    add_parser.add_argument("--uid")
-    add_parser.add_argument("-f", "--filename", help="filename stem without .ics")
-    add_parser.set_defaults(handler=command_add)
+    for name, status in (("add", "planned"), ("tentative", "tentative")):
+        add_parser = subparsers.add_parser(
+            name, parents=[mutation],
+            help="create a planned event" if name == "add" else "create a tentative event",
+        )
+        add_parser.add_argument("-s", "--scope", choices=("public", "internal"), required=True)
+        if name == "add":
+            add_parser.add_argument("--status", choices=tuple(STATUS_LABELS), default=status)
+        else:
+            add_parser.set_defaults(status=status)
+        add_parser.add_argument("--start", required=True)
+        add_schedule_options(add_parser, required=True)
+        add_parser.add_argument("--title", required=True)
+        add_parser.add_argument("--location")
+        add_parser.add_argument("--alarm-minutes", type=int)
+        add_parser.add_argument("--uid")
+        add_parser.add_argument("-f", "--filename", help="filename stem without .ics")
+        add_parser.set_defaults(handler=command_add)
 
     import_parser = subparsers.add_parser("import", parents=[mutation])
     import_parser.add_argument("source", help="external .ics file to normalize and import")
@@ -706,17 +747,24 @@ def parser() -> argparse.ArgumentParser:
     import_parser.add_argument("--status", choices=tuple(STATUS_LABELS))
     import_parser.set_defaults(handler=command_import)
 
-    update_parser = subparsers.add_parser("update", parents=[mutation])
-    update_parser.add_argument("identifier")
-    update_parser.add_argument("--start")
-    update_parser.add_argument("--end")
-    update_parser.add_argument("--title")
-    update_parser.add_argument("--location")
-    update_parser.add_argument("--status", choices=tuple(STATUS_LABELS))
-    alarm_group = update_parser.add_mutually_exclusive_group()
-    alarm_group.add_argument("--alarm-minutes", type=int)
-    alarm_group.add_argument("--clear-alarms", action="store_true")
-    update_parser.set_defaults(handler=command_update)
+    for name in ("update", "confirm"):
+        update_parser = subparsers.add_parser(
+            name, parents=[mutation],
+            help="update event fields" if name == "update" else "convert a tentative event to planned",
+        )
+        update_parser.add_argument("identifier", help="UID, filename, or repository-relative path")
+        update_parser.add_argument("--start")
+        add_schedule_options(update_parser)
+        update_parser.add_argument("--title")
+        update_parser.add_argument("--location")
+        if name == "update":
+            update_parser.add_argument("--status", choices=tuple(STATUS_LABELS))
+        else:
+            update_parser.set_defaults(status="planned")
+        alarm_group = update_parser.add_mutually_exclusive_group()
+        alarm_group.add_argument("--alarm-minutes", type=int)
+        alarm_group.add_argument("--clear-alarms", action="store_true")
+        update_parser.set_defaults(handler=command_update if name == "update" else command_confirm)
 
     delete_parser = subparsers.add_parser("delete", parents=[mutation])
     delete_parser.add_argument("identifier")
