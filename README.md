@@ -190,6 +190,8 @@ Every event must have a non-empty, repository-wide unique `UID`.
 For AI-assisted operations, use the GNU-style CLI:
 
 ```bash
+./bin/calendar prepare https://github.com/BETA-SDC/event-proposal/issues/58 \
+  --output /tmp/calendar-issue-58.json --json
 ./bin/calendar add -s public --title '活动 / Event' \
   --start 2026-11-01T14:00 --duration-minutes 120 --json
 ./bin/calendar tentative -s public --title '候选活动 / Candidate Event' \
@@ -207,6 +209,15 @@ For AI-assisted operations, use the GNU-style CLI:
 ./bin/calendar validate --json
 ./bin/calendar build --json
 ```
+
+`prepare` reads a GitHub issue through OpenCLI/gh and reports source evidence,
+unresolved fields, date candidates, and existing calendar entries. Save its
+JSON with `--output`, then use `add/tentative --input FILE` with explicit
+overrides for missing fields. Exact same-day schedules can be extracted from
+the event template; ambiguous dates, years, afternoon-only times, time zones,
+and comment changes remain for review. Issue #58 already exists, so its
+prepared result should be used to locate that entry rather than create another.
+`--issue-json` supports offline preparation from saved GitHub CLI JSON.
 
 `list`, `search`, and `agenda` support scope/status/date filters, `--limit`,
 and JSON field selection with `--fields`. `agenda` includes ongoing events

@@ -329,6 +329,9 @@ def command_list(args: argparse.Namespace) -> None:
 
 
 def command_inspect(args: argparse.Namespace) -> None:
+    if args.source.startswith("https://github.com/"):
+        command_prepare(args)
+        return
     source = Path(args.source).expanduser().resolve()
     calendar = Calendar.from_ical(source.read_bytes())
     existing = {
@@ -374,6 +377,71 @@ def command_inspect(args: argparse.Namespace) -> None:
         "source": str(source), "eventCount": len(results),
         "singleEvent": len(results) == 1, "events": results,
     }, args.json)
+
+
+def command_prepare(args: argparse.Namespace) -> None:
+    from issue_intake import canonical_issue_url, prepare_issue, read_issue
+
+    issue = read_issue(args.source, offline=args.issue_json)
+    prepared = prepare_issue(issue)
+    url = prepared["source"]["url"]
+    matches = []
+    for entries in load_source_events(args.root.resolve()).values():
+        for entry in entries:
+            source_url = str(entry.event.get("URL", "")).strip()
+            try:
+                source_url = canonical_issue_url(source_url)[0]
+            except ValueError:
+                pass
+            if source_url == url or event_uid(entry.event, entry.path) == prepared["draft"]["uid"]:
+                event = source_event_data(entry.path, entry.event, args.root.resolve())
+                matches.append({
+                    key: event[key] for key in ("uid", "title", "start", "end", "scope", "status", "path")
+                })
+    prepared["existingEvents"] = matches
+    if len(matches) == 1:
+        prepared["draft"]["uid"] = matches[0]["uid"]
+    if args.full_source:
+        prepared["body"] = issue["body"]
+    if args.output:
+        target = args.output.expanduser().resolve()
+        root = args.root.resolve()
+        if target.suffix.lower() != ".json" or any(target.is_relative_to(root / scope) for scope in ("public", "internal", ".git")):
+            fail("--output must be a JSON file outside source directories and .git")
+        if target.exists():
+            fail(f"output already exists: {target}")
+        with target.open("x", encoding="utf-8") as stream:
+            json.dump(prepared, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+        prepared = prepared | {
+            "inputPath": str(target),
+            "draft": {key: value for key, value in prepared["draft"].items() if key != "description"},
+            "existingEvents": [
+                {key: value for key, value in event.items() if key != "description"}
+                for event in matches
+            ],
+        }
+    output(prepared, args.json)
+
+
+def merge_creation_input(args: argparse.Namespace) -> None:
+    if args.input:
+        from issue_intake import read_draft
+
+        draft = read_draft(args.input)
+        endings = ("end", "duration_minutes", "duration_days")
+        if any(getattr(args, key) is not None for key in endings):
+            draft = {key: value for key, value in draft.items() if key not in endings}
+        for key, value in draft.items():
+            if getattr(args, key) is None:
+                setattr(args, key, value)
+    for key in ("scope", "title", "start"):
+        if not getattr(args, key):
+            fail(f"provide --{key} or a resolved field in --input")
+    if args.scope not in ("public", "internal"):
+        fail("--scope must be public or internal")
+    if sum(getattr(args, key) is not None for key in ("end", "duration_minutes", "duration_days")) != 1:
+        fail("provide exactly one of --end, --duration-minutes or --days (including --input)")
 
 
 def command_links(args: argparse.Namespace) -> None:
@@ -428,6 +496,7 @@ def command_show(args: argparse.Namespace) -> None:
 
 
 def command_add(args: argparse.Namespace) -> None:
+    merge_creation_input(args)
     require_bilingual(args.title, "--title")
     if args.location:
         require_bilingual(args.location, "--location")
@@ -688,7 +757,7 @@ def parser() -> argparse.ArgumentParser:
     filters.add_argument("--limit", type=positive_integer)
     filters.add_argument("--fields", help="comma-separated result fields (always emits JSON)")
     cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("--version", action="version", version="calendar-cli 1.2")
+    cli.add_argument("--version", action="version", version="calendar-cli 1.3")
     cli.add_argument("-v", "--verbose", action="store_true", help="enable verbose diagnostics")
     cli.add_argument(
         "--root",
@@ -711,9 +780,17 @@ def parser() -> argparse.ArgumentParser:
     agenda_parser.add_argument("--query")
     agenda_parser.set_defaults(handler=command_list)
 
-    inspect_parser = subparsers.add_parser("inspect", parents=[common], help="inspect an external ICS before importing")
+    inspect_parser = subparsers.add_parser("inspect", parents=[common], help="inspect an ICS or GitHub proposal")
     inspect_parser.add_argument("source")
+    inspect_parser.set_defaults(issue_json=False, output=None, full_source=False)
     inspect_parser.set_defaults(handler=command_inspect)
+
+    prepare_parser = subparsers.add_parser("prepare", parents=[common], help="extract a reviewable draft from a GitHub event issue")
+    prepare_parser.add_argument("source", help="GitHub issue URL, or saved issue JSON with --issue-json")
+    prepare_parser.add_argument("--issue-json", action="store_true", help="read saved gh issue JSON without network")
+    prepare_parser.add_argument("-o", "--output", type=Path, help="save a new draft JSON for add/tentative --input")
+    prepare_parser.add_argument("--full-source", action="store_true", help="include the complete issue body")
+    prepare_parser.set_defaults(handler=command_prepare)
 
     links_parser = subparsers.add_parser("links", parents=[common], help="get event and subscription URLs")
     links_parser.add_argument("identifier", help="UID, filename, or repository-relative path")
@@ -734,14 +811,15 @@ def parser() -> argparse.ArgumentParser:
             name, parents=[mutation],
             help="create a planned event" if name == "add" else "create a tentative event",
         )
-        add_parser.add_argument("-s", "--scope", choices=("public", "internal"), required=True)
+        add_parser.add_argument("-s", "--scope", choices=("public", "internal"))
         if name == "add":
             add_parser.add_argument("--status", choices=tuple(STATUS_LABELS), default=status)
         else:
             add_parser.set_defaults(status=status)
-        add_parser.add_argument("--start", required=True)
-        add_schedule_options(add_parser, required=True)
-        add_parser.add_argument("--title", required=True)
+        add_parser.add_argument("--input", help="prepared or flat draft JSON; '-' reads stdin; flags override draft fields")
+        add_parser.add_argument("--start")
+        add_schedule_options(add_parser)
+        add_parser.add_argument("--title")
         add_parser.add_argument("--location")
         add_parser.add_argument("--description", help="event notes, including unresolved details")
         add_parser.add_argument("--url", help="source issue or event URL")

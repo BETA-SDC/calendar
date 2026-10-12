@@ -26,7 +26,9 @@ class CalendarCliTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
 
-    def run_cli(self, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    def run_cli(
+        self, *arguments: str, check: bool = True, input_text: str | None = None
+    ) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
             [
                 sys.executable,
@@ -38,6 +40,7 @@ class CalendarCliTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            input=input_text,
         )
         if check:
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -56,6 +59,124 @@ class CalendarCliTest(unittest.TestCase):
             for scope in ("public", "internal")
             for path in (self.root / scope).rglob("*.ics")
         }
+
+    def issue_fixture(self, schedule: str, number: int = 999) -> Path:
+        path = self.root / "issue.json"
+        path.write_text(json.dumps({
+            "title": "[event] 准备流程测试",
+            "body": f"### 活动名称\n准备流程测试\n\n### 时间、地点和形式\n"
+                    f"- 时间：{schedule}\n- 地点：校内，场地待确认\n",
+            "url": f"https://github.com/BETA-SDC/event-proposal/issues/{number}",
+            "comments": [],
+        }, ensure_ascii=False), encoding="utf-8")
+        return path
+
+    def test_prepare_and_create_from_saved_draft(self) -> None:
+        issue = self.issue_fixture("2026-12-15 19:00-21:00")
+        target = self.root / "draft.json"
+        before = self.source_snapshot()
+        prepared = json.loads(self.run_cli(
+            "prepare", str(issue), "--issue-json", "--output", str(target), "-j",
+        ).stdout)
+        self.assertEqual(self.source_snapshot(), before)
+        self.assertEqual(prepared["draft"]["start"], "2026-12-15T19:00")
+        self.assertNotIn("description", prepared["draft"])
+        self.assertTrue(target.is_file())
+        preview = json.loads(self.run_cli(
+            "tentative", "--input", str(target), "-s", "public",
+            "--title", "准备流程测试 / Prepared Event Test", "--dry-run", "-j",
+        ).stdout)
+        self.assertEqual(self.source_snapshot(), before)
+        added = json.loads(self.run_cli(
+            "tentative", "--input", str(target), "-s", "public",
+            "--title", "准备流程测试 / Prepared Event Test", "-j",
+        ).stdout)
+        self.assertEqual(preview["uid"], added["uid"])
+        self.assertEqual(added["event"]["sourceUrl"], "https://github.com/BETA-SDC/event-proposal/issues/999")
+        self.assertIn("场地待确认", added["event"]["description"])
+        self.assertEqual(added["event"]["status"], "tentative")
+        self.assertEqual(added["event"]["end"], "2026-12-15T21:00:00+08:00")
+        self.assertNotEqual(self.run_cli(
+            "tentative", "--input", str(target), "-s", "public",
+            "--title", "准备流程测试 / Prepared Event Test", check=False,
+        ).returncode, 0)
+
+    def test_prepare_requires_explicit_placeholder_for_unresolved_schedule(self) -> None:
+        issue = self.issue_fixture("2026-11-11 下午，原消息未注明年份，按当前年份暂记")
+        target = self.root / "draft.json"
+        prepared = json.loads(self.run_cli("prepare", str(issue), "--issue-json", "-o", str(target), "-j").stdout)
+        self.assertEqual(prepared["candidates"]["dates"], ["2026-11-11"])
+        self.assertNotIn("start", prepared["draft"])
+        self.assertIn("year", [item["field"] for item in prepared["unresolved"]])
+        before = self.source_snapshot()
+        result = self.run_cli(
+            "tentative", "--input", str(target), "-s", "public",
+            "--title", "测试 / Test", check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.source_snapshot(), before)
+        preview = json.loads(self.run_cli(
+            "tentative", "--input", str(target), "-s", "public", "--title", "测试 / Test",
+            "--start", "2026-11-11", "--days", "1", "--dry-run", "-j",
+        ).stdout)
+        self.assertEqual(preview["event"]["end"], "2026-11-12")
+        self.assertEqual(self.source_snapshot(), before)
+
+    def test_prepare_recognizes_existing_source_url_and_legacy_uid(self) -> None:
+        issue = self.issue_fixture("2026-11-11 下午", number=58)
+        prepared = json.loads(self.run_cli("prepare", str(issue), "--issue-json", "-j").stdout)
+        self.assertEqual(len(prepared["existingEvents"]), 1)
+        self.assertEqual(prepared["draft"]["uid"], "event-proposal-58@beta-sdc.github.io")
+        self.assertEqual(prepared["existingEvents"][0]["status"], "tentative")
+
+    def test_creation_input_rejects_bad_fields_types_and_conflicts(self) -> None:
+        target = self.root / "input.json"
+        before = self.source_snapshot()
+        for draft in (
+            {"command": "delete"},
+            {"duration_minutes": 0},
+            {"alarm_minutes": -1},
+            {"duration_days": True},
+            {"scope": "other"},
+            {"title": ["活动"]},
+            {"start": "2026-12-20", "end": "2026-12-21", "duration_days": 1},
+            {"schemaVersion": 99, "draft": {}},
+        ):
+            target.write_text(json.dumps(draft), encoding="utf-8")
+            self.assertNotEqual(self.run_cli(
+                "tentative", "--input", str(target), "-s", "public",
+                "--title", "测试 / Test", check=False,
+            ).returncode, 0)
+            self.assertEqual(self.source_snapshot(), before)
+        target.write_text(json.dumps({
+            "scope": "public", "title": "测试 / Test", "start": "2026-12-20T19:00",
+            "end": "2026-12-20T21:00",
+        }), encoding="utf-8")
+        preview = json.loads(self.run_cli(
+            "add", "--input", str(target), "--duration-minutes", "30", "--dry-run", "-j",
+        ).stdout)
+        self.assertEqual(preview["event"]["end"], "2026-12-20T19:30:00+08:00")
+        self.assertEqual(self.source_snapshot(), before)
+
+    def test_creation_reads_prepared_json_from_stdin(self) -> None:
+        issue = self.issue_fixture("2026-12-15 19:00-21:00")
+        prepared = self.run_cli("prepare", str(issue), "--issue-json", "-j").stdout
+        before = self.source_snapshot()
+        preview = json.loads(self.run_cli(
+            "tentative", "--input", "-", "-s", "public",
+            "--title", "测试 / Test", "--dry-run", "-j", input_text=prepared,
+        ).stdout)
+        self.assertEqual(preview["event"]["start"], "2026-12-15T19:00:00+08:00")
+        self.assertEqual(self.source_snapshot(), before)
+
+    def test_prepare_does_not_overwrite_output_or_source_paths(self) -> None:
+        issue = self.issue_fixture("2026-12-15 19:00-21:00")
+        for target in (issue, self.root / "public" / "draft.json", self.root / ".git" / "draft.json"):
+            self.assertNotEqual(self.run_cli(
+                "prepare", str(issue), "--issue-json", "--output", str(target), check=False,
+            ).returncode, 0)
+        result = self.run_cli("prepare", str(issue), "--issue-json", "--full-source", "-j")
+        self.assertIn("body", json.loads(result.stdout))
 
     def test_add_and_tentative_accept_durations(self) -> None:
         timed = json.loads(self.run_cli(
