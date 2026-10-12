@@ -3,6 +3,9 @@
 This repository publishes one-event ICS source files and automatically
 builds aggregate feeds for different scopes and time periods.
 
+For AI-assisted maintenance, start with [AGENTS.md](AGENTS.md), then use
+`./bin/calendar COMMAND --help` for the relevant operation.
+
 Subscription page:
 
 https://beta-sdc.github.io/calendar/
