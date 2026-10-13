@@ -455,7 +455,12 @@ class CalendarCliTest(unittest.TestCase):
     def test_gnu_options_and_json_list(self) -> None:
         result = self.run_cli("list", "-s", "internal", "-j")
         events = json.loads(result.stdout)
-        self.assertEqual(len(events), 5)
+        expected_paths = {
+            path.relative_to(self.root).as_posix()
+            for path in (self.root / "internal").rglob("*.ics")
+        }
+        self.assertEqual({event["path"] for event in events}, expected_paths)
+        self.assertEqual(len(events), len(expected_paths))
         self.assertTrue(all(event["scope"] == "internal" for event in events))
 
     def test_add_update_and_delete(self) -> None:
