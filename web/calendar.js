@@ -405,6 +405,7 @@
         apiMode = true;
       }
       $("#login").hidden = !apiMode || Boolean(capability.user);
+      $("#login").href = capability.loginUrl || "/login";
       $("#account-name").textContent = capability.user?.username || "";
       $("#create").hidden = !capability.canEdit;
       $("#roles-open").hidden = capability.role !== "admin";

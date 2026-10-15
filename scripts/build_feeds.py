@@ -28,7 +28,7 @@ REFRESH_INTERVAL = "PT1H"
 BASE_URL = "https://beta-sdc.github.io/calendar"
 WEB_ASSETS = (
     "index.html", "events.html", "styles.css", "access.js", "app.js", "events.js",
-    "calendar.html", "calendar.css", "calendar.js", "mark.png",
+    "calendar.html", "calendar.css", "calendar.js", "calendar-login.js", "mark.png",
 )
 
 

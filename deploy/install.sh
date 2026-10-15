@@ -9,6 +9,8 @@ install_root=/opt/betasdc-calendar
 test "$source_dir" != "$install_root" || { echo "Run from a staging checkout." >&2; exit 1; }
 test -f "$2"
 if test "$#" = 3; then test -f "$3"; fi
+wheelhouse="$source_dir/work/wheels"
+python3 "$source_dir/deploy/wheels.py" --verify --output "$wheelhouse"
 backup="/var/backups/betasdc-calendar/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$backup"
 chmod 700 "$backup"
@@ -19,12 +21,16 @@ fi
 if test -f /etc/betasdc/calendar.env; then cp /etc/betasdc/calendar.env "$backup/calendar.env"; fi
 if test -f /etc/systemd/system/betasdc-calendar.service; then cp /etc/systemd/system/betasdc-calendar.service "$backup/worker.service"; fi
 cp /etc/betasdc/nginx.conf "$backup/nginx.conf"
+if test -f /etc/betasdc/calendar.nginx.conf; then
+  cp /etc/betasdc/calendar.nginx.conf "$backup/calendar.nginx.conf"
+fi
 mkdir -p "$install_root"
 # Copy tracked sources only; never copy a developer's venv or generated site.
 git -c safe.directory="$source_dir" -C "$source_dir" archive HEAD | tar -x -C "$install_root"
 ln -sfn server "$install_root/calendar_service"
 python3 -m venv "$install_root/.venv"
-"$install_root/.venv/bin/pip" install -r "$install_root/requirements-server.txt" gunicorn==23.0.0
+"$install_root/.venv/bin/python" -m pip --isolated --disable-pip-version-check install \
+  --no-index --find-links "$wheelhouse" -r "$install_root/requirements-deploy.txt"
 install -d -o betasdc -g www-data -m 700 /var/lib/betasdc-calendar
 if test "$#" = 3; then
   install -o betasdc -g www-data -m 600 "$2" /var/lib/betasdc-calendar/deploy-key
@@ -45,9 +51,15 @@ install -m 644 "$install_root/deploy/betasdc-calendar.service" /etc/systemd/syst
     runuser -u betasdc -- .venv/bin/python -m calendar_service.admin --username "$1"
   fi
 )
+install -m 644 "$install_root/deploy/calendar.nginx.conf" /etc/betasdc/calendar.nginx.conf
 "$install_root/.venv/bin/python" "$install_root/deploy/nginx_calendar.py" /etc/betasdc/nginx.conf
 if ! /usr/sbin/nginx -e stderr -t -c /etc/betasdc/nginx.conf; then
   cp "$backup/nginx.conf" /etc/betasdc/nginx.conf
+  if test -f "$backup/calendar.nginx.conf"; then
+    cp "$backup/calendar.nginx.conf" /etc/betasdc/calendar.nginx.conf
+  else
+    rm -f /etc/betasdc/calendar.nginx.conf
+  fi
   echo "Nginx validation failed; restored configuration." >&2
   exit 1
 fi
@@ -67,4 +79,4 @@ systemctl restart betasdc
 systemctl reload betasdc-nginx
 systemctl is-active betasdc betasdc-calendar
 echo "Installed. Backup: $backup"
-echo "Calendar: https://register.betasdc.duckdns.org/calendar/"
+echo "Calendar: https://calendar.betasdc.duckdns.org/"

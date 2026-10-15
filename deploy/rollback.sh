@@ -24,6 +24,11 @@ fi
 systemctl daemon-reload
 if test -f "$backup/nginx.conf"; then
   cp "$backup/nginx.conf" /etc/betasdc/nginx.conf
+  if test -f "$backup/calendar.nginx.conf"; then
+    cp "$backup/calendar.nginx.conf" /etc/betasdc/calendar.nginx.conf
+  else
+    rm -f /etc/betasdc/calendar.nginx.conf
+  fi
   /usr/sbin/nginx -e stderr -t -c /etc/betasdc/nginx.conf
   systemctl reload betasdc-nginx
 fi

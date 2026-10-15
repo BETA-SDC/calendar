@@ -31,8 +31,17 @@ npm run check
 beta 集成入口是 `calendar_service.beta_entry:create_app()`。
 安装时把本仓库 `server/` 作为 `calendar_service` 包提供，原有
 `server.registration` 仍从 `/opt/betasdc` 导入，避免模块名冲突。
-该工厂创建原有 Flask 应用，然后注册日历路由；登录、账号数据库、
-会话密钥、校园网络限制和 CSRF 校验均复用原服务。
+该工厂创建原有 Flask 应用，然后注册日历路由；登录验证、账号数据库、
+校园网络限制和 CSRF 校验复用原服务。
+
+正式入口使用 `https://calendar.betasdc.duckdns.org/`，根路径跳转到日历。
+同一 Gunicorn 服务按经过 Nginx 校验的 Host 分发账号站点与日历站点，
+两者分别校验网络、Host、Origin 和 CSRF。日历有独立的本地签名密钥与
+Host-only Secure cookie，不复制账号数据库或账号站点密钥。
+日历登录跳转到原 `register.betasdc.duckdns.org`，完成原有密码／GitHub
+登录后，以 60 秒有效、只能消费一次的随机授权码返回日历；
+授权码只以 SHA-256 保存在服务端，并绑定浏览器发起登录时的随机状态。
+原账号站点和 GitHub OAuth 回调地址保持原值。
 
 - 默认角色为查看者；编辑者可维护全部事件；管理员还可授权角色。
 - 启动管理员可指定已有、已验证邮箱的账号，或安装时自动选择。
@@ -99,7 +108,7 @@ worker 每 60 秒检查仓库其他入口的提交，使用同一文件锁校验
 
 ## beta 部署
 
-目标地址是 `https://register.betasdc.duckdns.org/calendar/`，
+目标地址是 `https://calendar.betasdc.duckdns.org/`，
 沿用原站点的校园网访问范围。服务必须由 root 安装，普通 `jet` 用户
 无法修改现有 `/opt/betasdc` 或 systemd 配置。
 
@@ -107,8 +116,15 @@ worker 每 60 秒检查仓库其他入口的提交，使用同一文件锁校验
 私钥与通过可信渠道核对的 GitHub known_hosts 存为服务器上的私有文件，
 凭据不进入 Git。也支持仅授权此仓库 Contents 读写的 fine-grained token。
 安装脚本只读取 staging 仓库已提交的 HEAD，所以部署前先提交。
+安装阶段完全离线安装 Python 依赖，避免 sudo 环境下访问 PyPI 失败。
+先在可访问 PyPI 的机器准备 Linux x86_64 / Python 3.12 的 wheels；
+可在 Mac 上运行该命令，然后把整个 `work/wheels/` 传入 beta staging
+目录的同名路径。依赖版本固定在 `requirements-deploy.txt`，
+manifest 记录包的 SHA-256 与需求文件摘要；安装前必须通过验证。
 
 ```bash
+python deploy/wheels.py
+# 把 work/wheels/ 同步到 beta staging 仓库的 work/wheels/
 sudo sh deploy/install.sh auto /secure/calendar-deploy-key /secure/github-known-hosts
 ```
 
@@ -122,10 +138,12 @@ sudo sh deploy/install.sh auto /secure/calendar-deploy-key /secure/github-known-
 2. 安装到 `/opt/betasdc-calendar`，建立独立虚拟环境。
 3. 配置 `/var/lib/betasdc-calendar`、专用凭据、worker 和登录服务 drop-in。
 4. 自动选择或创建管理员，首次同步构建站点。
-5. 仅给 `/api/calendar/` 增加 Nginx 32 KiB 请求上限，测试配置后重载。
+5. 给原站点 `/api/calendar/` 增加 32 KiB 请求上限，并安装独立日历域名
+   的 Nginx 配置，沿用现有通配符证书和校园网限制；测试配置后重载。
 6. 启动 worker，并重启登录服务。
 
-安装前检查：Python venv 可用，beta 可访问 GitHub，专用凭据有推送权，
+安装前检查：Python 3.12 venv 可用，离线包齐全，beta 可访问 GitHub，
+专用凭据有推送权，日历域名解析到 beta 且证书覆盖该域名，
 自动管理员结果。安装后检查原登录／注册、查看者写入被拒绝、编辑者新增、
 编辑和删除测试活动，检查 GitHub 提交和 feeds。页面保存后 GitHub Pages
 仍需等待 Actions；系统日历订阅客户端按自身刷新策略更新。

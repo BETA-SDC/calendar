@@ -57,7 +57,8 @@ def register_calendar(app, *, state, current_user, lookup_account, csrf_token):
         account = user()
         role = store.role(account["id"]) if account else "viewer"
         return jsonify(user={"id": account["id"], "username": account["username"]} if account else None,
-                       role=role, canEdit=role in ("editor", "admin"), csrf_token=csrf_token())
+                       role=role, canEdit=role in ("editor", "admin"), csrf_token=csrf_token(),
+                       loginUrl=app.config.get("CALENDAR_LOGIN_URL", "/login"))
 
     def events():
         try:
