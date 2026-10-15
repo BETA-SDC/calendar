@@ -167,11 +167,11 @@
       const source = info.event.extendedProps.source;
       const [zh, en] = split(source.title);
       const result = node("div", "", "event-content");
-      const compact = ["dayGridMonth", "quarter", "multiMonthYear"].includes(info.view.type);
-      result.append(node("div", compact ? (source.allDay ? "全天" : dt(source.start).toFormat("HH:mm")) : timeText(source), "event-time"),
+      result.append(node("div", timeText(source), "event-time"),
         node("div", zh, "event-title"), node("div", en, "english"));
+      if (source.location) result.append(node("p", split(source.location)[0], "event-location"));
       if (source.status === "tentative") result.append(node("div", "待定", "event-label"));
-      if (info.view.type === "dayGridDay") result.append(node("p", source.location, "agenda-meta"), badges(source));
+      if (info.view.type === "dayGridDay") result.append(badges(source));
       result.title = `${source.title}\n${timeText(source)}\n${source.location}`;
       return { domNodes: [result] };
     },

@@ -11,4 +11,14 @@
 .calendar-app .danger{color:#aa3030}.calendar-app[data-theme=dark] .danger,.calendar-app[data-theme=dark] #form-error,.calendar-app[data-theme=dark] #role-error,.calendar-app[data-theme=dark] #status.error{color:#ffaeae}
 .calendar-app .toolbar{flex-wrap:wrap}
 .calendar-app .fc-multimonth .event-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.calendar-app .fc .fc-multimonth tr:has(.fc-daygrid-event) .fc-daygrid-day-frame,.calendar-app[data-density=compact] .fc .fc-multimonth tr:has(.fc-daygrid-event) .fc-daygrid-day-frame{min-height:110px}
+.calendar-app .event-location{font-size:11px;line-height:1.5;margin-top:5px;overflow-wrap:anywhere}
+.calendar-app[data-density=comfortable] .fc .event-time{white-space:normal;overflow-wrap:anywhere}
+.calendar-app[data-density=compact] .event-content .event-time,
+.calendar-app[data-density=compact] .event-content .event-location,
+.calendar-app[data-density=compact] .event-content .event-label,
+.calendar-app[data-density=compact] .event-content .badges,
+.calendar-app[data-density=compact] .agenda-item .agenda-date,
+.calendar-app[data-density=compact] .agenda-item .agenda-meta,
+.calendar-app[data-density=compact] .agenda-item .badges{display:none}
+.calendar-app .fc .fc-multimonth tr:has(.fc-daygrid-event) .fc-daygrid-day-frame{min-height:200px}
+.calendar-app[data-density=compact] .fc .fc-multimonth tr:has(.fc-daygrid-event) .fc-daygrid-day-frame{min-height:72px}
