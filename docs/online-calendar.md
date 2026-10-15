@@ -35,6 +35,8 @@ beta 集成入口是 `calendar_service.beta_entry:create_app()`。
 和 CSRF 校验复用原服务。日历域名使用独立会话密钥，避免复制账号站点密钥。
 
 正式入口使用 `https://calendar.betasdc.duckdns.org/`，根路径跳转到日历。
+Nginx 和应用层统一允许已确认的校园网段：`10.16.112.0/20`、
+`10.17.0.0/18`、`10.17.128.0/18`；不泛化为全部内网或公网。
 注册和邮箱验证仍固定跳转到 `https://register.betasdc.duckdns.org/`，
 日历域名只提供登录、账户状态和日历编辑。注册站点继续作为专门的账号
 入口，已有账号可直接在日历域名登录。GitHub 登录继续由原注册站点提供，

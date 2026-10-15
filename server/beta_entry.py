@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 
 from .api import register_calendar
-from .login_bridge import CALENDAR_HOST, HostRouter, REGISTRATION_HOST, private_key
+from .login_bridge import CALENDAR_HOST, CAMPUS_NETWORKS, HostRouter, REGISTRATION_HOST, private_key
 
 
 def create_app():
@@ -13,9 +13,10 @@ def create_app():
 
     state = Path(os.environ.get("CALENDAR_STATE", "/var/lib/betasdc-calendar"))
     state.mkdir(parents=True, exist_ok=True)
-    app = create_registration_app()
+    app = create_registration_app(config={"REGISTRATION_NETWORKS": CAMPUS_NETWORKS})
     calendar_app = create_registration_app(config={
         "REGISTRATION_DOMAIN": CALENDAR_HOST,
+        "REGISTRATION_NETWORKS": CAMPUS_NETWORKS,
         "SECRET_KEY": private_key(state / "calendar.session-key"),
         "GITHUB_CLIENT_ID": "",
     })

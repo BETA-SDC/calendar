@@ -4,10 +4,9 @@ import os
 import re
 import stat
 
-from flask import request
-
 REGISTRATION_HOST = "register.betasdc.duckdns.org"
 CALENDAR_HOST = "calendar.betasdc.duckdns.org"
+CAMPUS_NETWORKS = ("10.16.112.0/20", "10.17.0.0/18", "10.17.128.0/18")
 KEY_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 
@@ -35,7 +34,18 @@ class HostRouter:
         self.calendar_wsgi = calendar_wsgi
 
     def __call__(self, environ, start_response):
-        app = (self.calendar_wsgi
-               if environ.get("HTTP_HOST", "").lower() == CALENDAR_HOST
-               else self.account_wsgi)
+        calendar_host = environ.get("HTTP_HOST", "").lower() == CALENDAR_HOST
+        # Read-only top-level entry pages may be linked from other sites.
+        # Keep Origin, network, API and all mutation checks unchanged.
+        if (calendar_host and environ.get("REQUEST_METHOD") == "GET"
+                and environ.get("PATH_INFO") in {
+                    "/", "/calendar/", "/calendar/calendar.html",
+                    "/login", "/account", "/register", "/verify",
+                }
+                and environ.get("HTTP_SEC_FETCH_SITE") == "cross-site"
+                and environ.get("HTTP_SEC_FETCH_MODE") == "navigate"
+                and environ.get("HTTP_SEC_FETCH_DEST") == "document"):
+            environ = environ.copy()
+            environ.pop("HTTP_SEC_FETCH_SITE")
+        app = self.calendar_wsgi if calendar_host else self.account_wsgi
         return app(environ, start_response)
