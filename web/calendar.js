@@ -462,8 +462,8 @@
         capability = await request("/session");
         csrf = capability.csrf_token;
         apiMode = true;
-        guestMode = !capability.user;
-        unlocked = Boolean(capability.user);
+        guestMode = !capability.canViewAll;
+        unlocked = Boolean(capability.canViewAll);
         if (guestMode) {
           activeCategories = preferences.categories.filter((category) => category.id === "public-planned");
           settings.categories = ["public-planned"];

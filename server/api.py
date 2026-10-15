@@ -3,11 +3,12 @@ from datetime import date, datetime
 import json
 from pathlib import Path
 import secrets
+import time
 import uuid
 import re
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, abort, jsonify, redirect, request, send_from_directory, session
+from flask import Blueprint, abort, current_app, jsonify, redirect, request, send_from_directory, session
 from .publisher import validate_payload
 from .store import Store
 
@@ -22,13 +23,38 @@ def register_calendar(app, *, state, current_user, csrf_token):
     def user():
         return current_user()
 
-    def require_editor():
+    def account_access(account):
+        if not account:
+            return {"role": "viewer", "member": False, "owner": False}
+        registration_store = current_app.extensions.get("registration_store")
+        if registration_store is None:
+            # The standalone calendar test app has no account database. Its
+            # local calendar roles remain a test-only compatibility fallback.
+            actual = store.role(account["id"])
+            return {"role": actual, "member": actual in ("editor", "admin"),
+                    "owner": actual in ("editor", "admin")}
+        now = int(time.time())
+        with registration_store.connection() as connection:
+            owner = connection.execute(
+                "SELECT 1 FROM github_admin_grants a JOIN github_accounts g ON g.user_id=a.user_id "
+                "WHERE a.user_id=? AND a.valid_until>?",
+                (account["id"], now),
+            ).fetchone() is not None
+            member = connection.execute(
+                "SELECT 1 FROM group_members m JOIN account_groups g ON g.id=m.group_id "
+                "WHERE m.user_id=? AND m.source='github' AND g.external_key=? AND g.archived=0 "
+                "AND (m.valid_until IS NULL OR m.valid_until>?)",
+                (account["id"], "github:org:BETA-SDC", now),
+            ).fetchone() is not None
+        return {"role": "owner" if owner else "member" if member else "viewer",
+                "member": member or owner, "owner": owner}
+
+    def require_owner():
         account = user()
         if not account:
             abort(401, description="请先登录。")
-        actual = store.role(account["id"])
-        if actual not in ("editor", "admin"):
-            abort(403, description="没有日历编辑权限。")
+        if not account_access(account)["owner"]:
+            abort(403, description="只有 BETA-SDC Owner 可以管理日历。")
         return account
 
     @api.before_request
@@ -55,9 +81,11 @@ def register_calendar(app, *, state, current_user, csrf_token):
     @api.get("/session")
     def capabilities():
         account = user()
-        role = store.role(account["id"]) if account else "viewer"
+        access = account_access(account)
         return jsonify(user={"id": account["id"], "username": account["username"]} if account else None,
-                       role=role, canEdit=role in ("editor", "admin"), csrf_token=csrf_token(),
+                       role=access["role"], isMember=access["member"], isOwner=access["owner"],
+                       canViewAll=access["member"], canEdit=access["owner"],
+                       csrf_token=csrf_token(),
                        loginUrl=app.config.get("CALENDAR_LOGIN_URL", "/login"))
 
     def events():
@@ -87,10 +115,11 @@ def register_calendar(app, *, state, current_user, csrf_token):
         last = local_date(request.args["end"]) if request.args.get("end") else None
         if first and last and first >= last:
             abort(422, description="结束日期须晚于开始日期。")
-        role = store.role(account["id"]) if account else "viewer"
+        access = account_access(account)
+        can_view_all = access["member"]
         result = []
         for event in items:
-            if not account and not public_planned(event):
+            if not can_view_all and not public_planned(event):
                 continue
             start = local_date(event["start"])
             end = local_date(event["end"]) if event["end"] else start
@@ -99,13 +128,13 @@ def register_calendar(app, *, state, current_user, csrf_token):
             if first and (end < first or (event["allDay"] and event["end"] and end == first)):
                 continue
             result.append(event | {"actions": {
-                "edit": role in ("editor", "admin") and not event["recurring"],
-                "delete": role in ("editor", "admin"),
+                "edit": access["owner"] and not event["recurring"],
+                "delete": access["owner"],
             }})
         return jsonify(events=result)
 
     def queue(operation, uid=None):
-        actor = require_editor()
+        actor = require_owner()
         payload = request.get_json()
         try:
             validate_payload(payload, operation)
@@ -154,7 +183,7 @@ def register_calendar(app, *, state, current_user, csrf_token):
         if not actor:
             abort(401, description="请先登录。")
         job = store.job(job_id)
-        if not job or (job["user_id"] != actor["id"] and store.role(actor["id"]) != "admin"):
+        if not job or (job["user_id"] != actor["id"] and not account_access(actor)["owner"]):
             abort(404, description="发布请求不存在。")
         return jsonify(id=job["id"], state=job["state"], commit=job["commit_sha"], error=job["error"])
 
@@ -172,7 +201,7 @@ def register_calendar(app, *, state, current_user, csrf_token):
 
     @pages.before_request
     def guest_pages():
-        if user():
+        if account_access(user())["member"]:
             return None
         asset = (request.view_args or {}).get("asset", "calendar.html")
         if asset in {"index.html", "events.html"}:
@@ -192,6 +221,29 @@ def register_calendar(app, *, state, current_user, csrf_token):
     @pages.get("/calendar/calendar-config.json")
     def calendar_config():
         return jsonify(api=True)
+
+    @pages.get("/calendar/calendar-data.json")
+    @pages.get("/calendar/events-data.json")
+    def filtered_calendar_data():
+        asset = request.path.rsplit("/", 1)[-1]
+        try:
+            payload = json.loads((state / "current" / asset).read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            abort(503, description="日历正在同步，请稍后重试。")
+        if account_access(user())["member"]:
+            return jsonify(payload)
+        if asset == "calendar-data.json":
+            payload["feeds"] = {
+                key: value for key, value in payload.get("feeds", {}).items()
+                if key.startswith("public@planned")
+            }
+            payload["restrictedIncluded"] = False
+        else:
+            payload["events"] = [
+                event for event in payload.get("events", []) if public_planned(event)
+            ]
+            payload["restrictedIncluded"] = False
+        return jsonify(payload)
 
     # FullCalendar injects its own stylesheet and sets element style attributes.
     # Limit the host CSP relaxation to calendar documents, never account pages.

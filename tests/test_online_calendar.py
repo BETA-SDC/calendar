@@ -90,7 +90,7 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/calendar/roles").status_code, 404)
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 202)
 
-    def test_guests_only_read_public_planned_events_and_members_read_all(self):
+    def test_guests_and_nonmembers_only_read_public_planned_events(self):
         response = self.client.get("/api/calendar/events")
         expected = [event for event in self.data()
                     if event["scope"] == "public" and event["status"] == "planned"]
@@ -107,7 +107,17 @@ class OnlineCalendarTest(unittest.TestCase):
             with self.client.get("/calendar/" + asset) as response:
                 self.assertEqual(response.status_code, 200)
         self.login(3)
-        self.assertEqual(len(self.client.get("/api/calendar/events").json["events"]), len(self.data()))
+        self.assertEqual(
+            {event["uid"] for event in self.client.get("/api/calendar/events").json["events"]},
+            {event["uid"] for event in expected},
+        )
+        self.assertEqual(
+            self.client.get("/calendar/events-data.json").json["events"],
+            expected,
+        )
+        subscription = self.client.get("/calendar/calendar-data.json").json
+        self.assertTrue(subscription["feeds"])
+        self.assertTrue(all(key.startswith("public@planned") for key in subscription["feeds"]))
         with self.client.get("/calendar/") as response:
             self.assertEqual(response.status_code, 200)
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 403)
@@ -128,6 +138,10 @@ class OnlineCalendarTest(unittest.TestCase):
         self.login(3)
         with self.client.get("/calendar/events-data.json") as response:
             self.assertEqual(response.status_code, 200)
+        for event in self.data():
+            with self.client.get("/calendar/" + event["path"]) as response:
+                allowed = event["scope"] == "public" and event["status"] == "planned"
+                self.assertEqual(response.status_code, 200 if allowed else 404, event["path"])
 
     def test_job_ownership_and_revoked_permissions(self):
         self.login(1)

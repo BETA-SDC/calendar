@@ -109,12 +109,15 @@ def run(args, cwd=None, *, timeout=60, env=None):
 
 
 class Publisher:
-    def __init__(self, state, remote, store, branch="main"):
+    def __init__(self, state, remote, store, branch="main", can_manage=None):
         self.state = Path(state)
         self.state.mkdir(parents=True, exist_ok=True)
         self.remote = remote
         self.branch = branch
         self.store = store
+        self.can_manage = can_manage or (
+            lambda user_id: self.store.role(user_id) in ("admin", "editor")
+        )
         self.env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_AUTHOR_NAME="BETA Calendar",
                         GIT_AUTHOR_EMAIL="calendar@betasdc.invalid",
                         GIT_COMMITTER_NAME="BETA Calendar", GIT_COMMITTER_EMAIL="calendar@betasdc.invalid")
@@ -210,7 +213,7 @@ class Publisher:
                 self.activate(self.stage(root, head))
                 self.store.finish(job["id"], "succeeded", matched)
                 return
-            if self.store.role(job["user_id"]) not in ("admin", "editor"):
+            if not self.can_manage(job["user_id"]):
                 raise PublicationError("编辑权限已被撤销。")
             self.store.finish(job["id"], "running")
             self.apply(root, job)
