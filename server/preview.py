@@ -19,6 +19,7 @@ def main():
         return send_from_directory(args.site, "calendar.html")
 
     @app.get("/<path:asset>")
+    @app.get("/calendar/<path:asset>")
     def assets(asset):
         return send_from_directory(args.site, asset)
 

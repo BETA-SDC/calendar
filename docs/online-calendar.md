@@ -31,17 +31,14 @@ npm run check
 beta 集成入口是 `calendar_service.beta_entry:create_app()`。
 安装时把本仓库 `server/` 作为 `calendar_service` 包提供，原有
 `server.registration` 仍从 `/opt/betasdc` 导入，避免模块名冲突。
-该工厂创建原有 Flask 应用，然后注册日历路由；登录验证、账号数据库、
-校园网络限制和 CSRF 校验复用原服务。
+该工厂在日历域名上直接承载登录页面和登录 API；账号数据库、校园网络限制
+和 CSRF 校验复用原服务。日历域名使用独立会话密钥，避免复制账号站点密钥。
 
 正式入口使用 `https://calendar.betasdc.duckdns.org/`，根路径跳转到日历。
-同一 Gunicorn 服务按经过 Nginx 校验的 Host 分发账号站点与日历站点，
-两者分别校验网络、Host、Origin 和 CSRF。日历有独立的本地签名密钥与
-Host-only Secure cookie，不复制账号数据库或账号站点密钥。
-日历登录跳转到原 `register.betasdc.duckdns.org`，完成原有密码／GitHub
-登录后，以 60 秒有效、只能消费一次的随机授权码返回日历；
-授权码只以 SHA-256 保存在服务端，并绑定浏览器发起登录时的随机状态。
-原账号站点和 GitHub OAuth 回调地址保持原值。
+注册和邮箱验证仍固定跳转到 `https://register.betasdc.duckdns.org/`，
+日历域名只提供登录、账户状态和日历编辑。注册站点继续作为专门的账号
+入口，已有账号可直接在日历域名登录。GitHub 登录继续由原注册站点提供，
+日历登录页只启用与当前回调配置匹配的登录方式。
 
 - 默认角色为查看者；编辑者可维护全部事件；管理员还可授权角色。
 - 启动管理员可指定已有、已验证邮箱的账号，或安装时自动选择。

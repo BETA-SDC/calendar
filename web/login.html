@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>登录 · BETA 日历</title>
+  <link rel="icon" href="/calendar/mark.png">
+  <link rel="stylesheet" href="/calendar/calendar.css">
+  <link rel="stylesheet" href="/calendar/login.css">
+  <script src="/calendar/login.js" defer></script>
+</head>
+<body>
+  <header class="site-header"><a class="brand" href="/calendar/"><img src="/calendar/mark.png" width="36" height="36" alt="">BETA 日历</a><nav><a href="/calendar/">返回日历</a></nav></header>
+  <main class="login-page">
+    <h1>登录日历</h1>
+    <form id="login-form">
+      <fieldset>
+        <label>用户名或邮箱<input name="identifier" autocomplete="username" required maxlength="254"></label>
+        <label>密码<input name="password" type="password" autocomplete="current-password" required maxlength="128"></label>
+      </fieldset>
+      <p id="login-error" role="alert"></p>
+      <button id="login-submit" class="primary" type="submit">登录</button>
+    </form>
+    <p class="register-link">没有账号？<a href="https://register.betasdc.duckdns.org/register">前往注册站点</a></p>
+  </main>
+</body>
+</html>
