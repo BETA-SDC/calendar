@@ -11,4 +11,4 @@
 .calendar-app .danger{color:#aa3030}.calendar-app[data-theme=dark] .danger,.calendar-app[data-theme=dark] #form-error,.calendar-app[data-theme=dark] #role-error,.calendar-app[data-theme=dark] #status.error{color:#ffaeae}
 .calendar-app .toolbar{flex-wrap:wrap}
 .calendar-app .fc-multimonth .event-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.calendar-app .fc .fc-multimonth .fc-daygrid-day-frame,.calendar-app[data-density=compact] .fc .fc-multimonth .fc-daygrid-day-frame{min-height:110px}
+.calendar-app .fc .fc-multimonth tr:has(.fc-daygrid-event) .fc-daygrid-day-frame,.calendar-app[data-density=compact] .fc .fc-multimonth tr:has(.fc-daygrid-event) .fc-daygrid-day-frame{min-height:110px}
