@@ -9,6 +9,7 @@
   try { settings = preferences.normalize(JSON.parse(localStorage.getItem("beta-calendar-preferences"))); } catch {}
   const memberCategories = [...settings.categories];
   const media = window.matchMedia("(prefers-color-scheme: dark)");
+  settings.theme = "system";
   function applyAppearance() {
     document.body.dataset.theme = preferences.theme(settings.theme, media.matches);
     document.body.dataset.density = settings.density;
@@ -20,6 +21,13 @@
   }
   applyAppearance();
   media.addEventListener("change", applyAppearance);
+  fetch("/api/site/session", {credentials: "same-origin", cache: "no-store"})
+    .then((response) => response.ok ? response.json() : null)
+    .then((state) => {
+      settings.theme = state?.user?.preferences?.theme || "system";
+      applyAppearance();
+    })
+    .catch(() => {});
   const editor = $("#editor");
   const form = $("#event-form");
   const field = (name) => form.elements.namedItem(name);
@@ -214,9 +222,8 @@
     label.append(checkbox, node("span", category.label, "category-label"), count);
     $("#category-list").append(label);
   }
-  $("#theme").value = settings.theme;
   $("#density").value = settings.density;
-  for (const key of ["theme", "density"]) $(`#${key}`).addEventListener("change", () => {
+  for (const key of ["density"]) $(`#${key}`).addEventListener("change", () => {
     settings[key] = $(`#${key}`).value;
     saveSettings();
     applyAppearance();
