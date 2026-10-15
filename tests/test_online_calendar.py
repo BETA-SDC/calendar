@@ -41,7 +41,6 @@ class OnlineCalendarTest(unittest.TestCase):
         self.app.secret_key = "test-only"
         register_calendar(self.app, state=self.state,
                           current_user=lambda: self.accounts.get(session.get("user_id")),
-                          lookup_account=self.accounts.get,
                           csrf_token=lambda: session.setdefault("csrf_token", "csrf-test"))
         self.client = self.app.test_client()
         self.payload = {"title": "测试 / Test", "scope": "public",
@@ -87,7 +86,7 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 403)
         self.login(1)
         self.assertEqual(self.client.post("/api/calendar/events", json=self.payload).status_code, 403)
-        self.assertEqual(self.client.get("/api/calendar/roles").status_code, 403)
+        self.assertEqual(self.client.get("/api/calendar/roles").status_code, 404)
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 202)
 
     def test_beta_member_read_gate_and_public_pages_compatibility(self):
@@ -97,7 +96,7 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertEqual(self.client.get("/calendar/events-data.json").location, "/login")
         self.assertEqual(self.client.get("/api/calendar/events").status_code, 401)
         self.assertEqual(self.client.get("/api/calendar/session").status_code, 200)
-        for asset in ("calendar.css", "login.css", "login.js", "mark.png"):
+        for asset in ("calendar.css", "login.css", "login.js", "calendar-account.js", "mark.png"):
             with self.client.get("/calendar/" + asset) as response:
                 self.assertEqual(response.status_code, 200)
         self.login(3)
@@ -126,12 +125,16 @@ class OnlineCalendarTest(unittest.TestCase):
                         self.payload | {"alarmMode": ["set"]}):
             self.assertEqual(self.send("POST", "/events", payload).status_code, 422, payload)
 
-    def test_admin_roles_and_last_administrator(self):
+    def test_role_management_is_not_exposed_by_calendar(self):
         self.login(2)
-        self.assertEqual(self.send("PUT", "/roles", {"userId": 3, "role": "editor"}).status_code, 200)
-        self.assertEqual(self.store.role(3), "editor")
-        self.assertEqual(self.send("PUT", "/roles", {"userId": 999, "role": "editor"}).status_code, 422)
-        self.assertEqual(self.send("PUT", "/roles", {"userId": 2, "role": "viewer"}).status_code, 409)
+        self.assertEqual(self.client.get("/api/calendar/roles").status_code, 404)
+        self.assertEqual(self.send("PUT", "/roles", {"userId": 3, "role": "editor"}).status_code, 404)
+        self.assertEqual(self.store.role(3), "viewer")
+        with self.client.get("/calendar/") as response:
+            self.assertNotIn(b'roles-open', response.data)
+            self.assertNotIn(b'role-form', response.data)
+        with self.assertRaises(ValueError):
+            self.store.grant(self.admin, self.admin, "viewer")
 
     def test_idempotent_write_and_other_user_reuse(self):
         self.login(1)

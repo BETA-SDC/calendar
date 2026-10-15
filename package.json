@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "vendor": "node scripts/vendor.mjs",
-    "check": "node --check web/calendar.js && node --check web/calendar-preferences.js && node --check web/login.js && node --check scripts/vendor.mjs",
-    "test": "node --test tests/calendar-preferences.test.cjs"
+    "check": "node --check web/calendar.js && node --check web/calendar-preferences.js && node --check web/calendar-account.js && node --check web/login.js && node --check scripts/vendor.mjs",
+    "test": "node --test tests/*.test.cjs"
   },
   "dependencies": {
     "fullcalendar": "6.1.19",

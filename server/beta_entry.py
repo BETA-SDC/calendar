@@ -1,7 +1,6 @@
 """Gunicorn factory wrapping the existing BETA authentication application."""
 import os
 from pathlib import Path
-import sqlite3
 
 from .api import register_calendar
 from .login_bridge import CALENDAR_HOST, CAMPUS_NETWORKS, HostRouter, REGISTRATION_HOST, private_key
@@ -29,15 +28,8 @@ def create_app():
             return current_app.extensions["registration_store"].find_account(account["username"])
         return None
 
-    def lookup(user_id):
-        with app.extensions["registration_store"].connection() as db:
-            db.row_factory = sqlite3.Row
-            row = db.execute("SELECT id,username FROM registrations "
-                             "WHERE id=? AND email_verified_at IS NOT NULL", (user_id,)).fetchone()
-            return dict(row) if row else None
-
     calendar_store = register_calendar(calendar_app, state=state, current_user=current_user,
-                                      lookup_account=lookup, csrf_token=csrf_token)
+                                      csrf_token=csrf_token)
     app.extensions["calendar_store"] = calendar_store
     @calendar_app.before_request
     def calendar_entry():

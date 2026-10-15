@@ -5,9 +5,7 @@
   const submit = document.querySelector("#login-submit");
   let csrf = "";
   async function session() {
-    const response = await fetch("/api/session", { cache: "no-store" });
-    if (!response.ok) throw new Error("会话加载失败，请刷新重试。");
-    const body = await response.json();
+    const body = await CalendarAccount.session();
     csrf = body.csrf_token;
     if (body.user) location.replace("/calendar/");
   }

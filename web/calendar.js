@@ -129,6 +129,7 @@
     for (const category of preferences.categories) {
       calendar.addEventSource({
         id: category.id,
+        backgroundColor: "var(--event-fill)", borderColor: "var(--category)", textColor: "var(--event-ink)",
         events: visibleEvents().filter((event) => preferences.categoryId(event) === category.id).map((event) => ({
           id: event.uid, title: event.title, start: event.start, end: event.end,
           allDay: event.allDay, extendedProps: { source: event },
@@ -143,6 +144,7 @@
   }
 
   const calendar = new FullCalendar.Calendar($("#calendar"), {
+    themeSystem: "standard",
     initialView: "dayGridMonth", locale: "zh-cn", timeZone: zone, firstDay: 1,
     headerToolbar: false, height: "auto", fixedWeekCount: false,
     dayMaxEvents: 3, eventOrder: "start,title", eventDisplay: "block",
@@ -160,13 +162,6 @@
       $(".calendar-scroll").classList.toggle("week-scroll", info.view.type === "dayGridWeek");
       $("#jump-date").value = dt(calendar.getDate().toISOString()).toISODate();
       renderAgenda();
-      requestAnimationFrame(() => {
-        for (const heading of document.querySelectorAll(".fc-multimonth-title")) {
-          heading.setAttribute("role", "button");
-          heading.setAttribute("tabindex", "0");
-          heading.setAttribute("aria-label", `打开${heading.textContent}月视图`);
-        }
-      });
     },
     eventContent(info) {
       const source = info.event.extendedProps.source;
@@ -441,28 +436,6 @@
     catch (error) { message(error.message, true); }
   });
 
-  async function loadRoles() {
-    const body = await request("/roles");
-    $("#role-list").replaceChildren(...body.roles.map((role) => {
-      const row = node("div", "", "role-row");
-      row.append(node("span", `${role.username} · ID ${role.userId}`), node("span", { viewer: "查看者", editor: "编辑者", admin: "管理员" }[role.role]));
-      return row;
-    }));
-  }
-  $("#roles-open").addEventListener("click", async () => {
-    $("#roles").showModal();
-    try { await loadRoles(); } catch (error) { $("#role-error").textContent = error.message; }
-  });
-  $("#roles-close").addEventListener("click", () => $("#roles").close());
-  $("#role-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const values = new FormData(event.target);
-    try {
-      await request("/roles", { method: "PUT", body: JSON.stringify({ userId: Number(values.get("userId")), role: values.get("role") }) });
-      await loadRoles();
-      $("#role-error").textContent = "已更新";
-    } catch (error) { $("#role-error").textContent = error.message; }
-  });
   async function initialize() {
     try {
       const configResponse = await fetch("calendar-config.json", { cache: "no-store" });
@@ -479,7 +452,6 @@
       $("#account-name").textContent = capability.user?.username || "";
       $("#logout").hidden = !apiMode || !capability.user;
       $("#create").hidden = !capability.canEdit;
-      $("#roles-open").hidden = capability.role !== "admin";
       if (capability.user) {
         try { pendingJob = localStorage.getItem(`beta-calendar-job-${capability.user.id}`); } catch {}
         $("#resume").hidden = !pendingJob;
@@ -489,27 +461,25 @@
     lucide.createIcons();
   }
   $("#logout").addEventListener("click", async () => {
-    if (saving || pendingJob) { message("请先确认当前发布结果。", true); return; }
+    if ((saving || pendingJob) && !window.confirm("有更改尚待确认发布结果。退出不会撤回已提交的更改，再次登录可查看结果。仍要退出？")) return;
+    if (editor.open && !$("#fields").hidden && !saving && !pendingJob
+        && !window.confirm("退出将放弃尚未保存的表单内容。仍要退出？")) return;
+    $("#logout").disabled = true;
     try {
-      const response = await fetch("/api/logout", { method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: "{}" });
-      if (!response.ok) throw new Error("退出失败，请刷新重试。");
+      await CalendarAccount.logout();
+      try { sessionStorage.removeItem("beta-calendar-unlocked"); } catch {}
+      events = [];
+      for (const source of calendar.getEventSources()) source.remove();
+      $("#agenda").replaceChildren();
+      editor.close();
       location.replace("/login");
-    } catch (error) { message(error.message, true); }
-  });
-  // Multi-month headings open that month without replacing FullCalendar's rendering.
-  $("#calendar").addEventListener("click", (event) => {
-    const heading = event.target.closest(".fc-multimonth-title");
-    if (heading) {
-      const month = heading.closest(".fc-multimonth-month")?.dataset.date;
-      if (month) calendar.changeView("dayGridMonth", `${month.slice(0, 7)}-01`);
+    } catch (error) {
+      message(error.message || "无法连接服务器，退出未完成，请重试。", true);
+      $("#logout").disabled = false;
     }
   });
-  $("#calendar").addEventListener("keydown", (event) => {
-    if (["Enter", " "].includes(event.key) && event.target.matches(".fc-multimonth-title")) {
-      event.preventDefault();
-      event.target.click();
-    }
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && apiMode) location.reload();
   });
   initialize();
 })();

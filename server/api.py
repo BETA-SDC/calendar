@@ -12,7 +12,7 @@ from .publisher import validate_payload
 from .store import Store
 
 
-def register_calendar(app, *, state, current_user, lookup_account, csrf_token):
+def register_calendar(app, *, state, current_user, csrf_token):
     state = Path(state)
     store = Store(state / "calendar.sqlite3")
     api = Blueprint("calendar_api", __name__, url_prefix="/api/calendar")
@@ -22,12 +22,12 @@ def register_calendar(app, *, state, current_user, lookup_account, csrf_token):
     def user():
         return current_user()
 
-    def require(role="editor"):
+    def require_editor():
         account = user()
         if not account:
             abort(401, description="请先登录。")
         actual = store.role(account["id"])
-        if actual != "admin" and (role == "admin" or actual != "editor"):
+        if actual not in ("editor", "admin"):
             abort(403, description="没有日历编辑权限。")
         return account
 
@@ -101,7 +101,7 @@ def register_calendar(app, *, state, current_user, lookup_account, csrf_token):
         return jsonify(events=result)
 
     def queue(operation, uid=None):
-        actor = require()
+        actor = require_editor()
         payload = request.get_json()
         try:
             validate_payload(payload, operation)
@@ -154,28 +154,6 @@ def register_calendar(app, *, state, current_user, lookup_account, csrf_token):
             abort(404, description="发布请求不存在。")
         return jsonify(id=job["id"], state=job["state"], commit=job["commit_sha"], error=job["error"])
 
-    @api.get("/roles")
-    def read_roles():
-        require("admin")
-        return jsonify(roles=store.roles())
-
-    @api.put("/roles")
-    def grant():
-        actor = require("admin")
-        payload = request.get_json()
-        if (not isinstance(payload, dict) or set(payload) != {"userId", "role"}
-                or type(payload["userId"]) is not int or payload["userId"] < 1
-                or payload["role"] not in ("viewer", "editor", "admin")):
-            abort(422, description="授权参数无效。")
-        account = lookup_account(payload["userId"])
-        if not account:
-            abort(422, description="账号不存在或尚未验证邮箱。")
-        try:
-            store.grant(actor, account, payload["role"])
-        except ValueError as exc:
-            abort(409, description=str(exc))
-        return jsonify(ok=True)
-
     @pages.get("/calendar/")
     @pages.get("/calendar/<path:asset>")
     def calendar_page(asset="calendar.html"):
@@ -190,7 +168,7 @@ def register_calendar(app, *, state, current_user, lookup_account, csrf_token):
         if not app.config.get("CALENDAR_MEMBERS_ONLY") or user():
             return None
         asset = request.view_args.get("asset", "") if request.view_args else ""
-        if asset not in {"calendar.css", "login.css", "login.js", "mark.png"}:
+        if asset not in {"calendar.css", "login.css", "login.js", "calendar-account.js", "mark.png"}:
             return redirect("/login")
 
     @pages.get("/calendar/calendar-config.json")

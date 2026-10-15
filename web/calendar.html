@@ -13,13 +13,14 @@
   <script src="vendor/fullcalendar-luxon.js" defer></script>
   <script src="vendor/lucide.js" defer></script>
   <script src="calendar-preferences.js" defer></script>
+  <script src="calendar-account.js" defer></script>
   <script src="calendar.js" defer></script>
 </head>
 <body class="calendar-app">
   <header class="site-header">
     <a class="brand" href="calendar.html"><img src="mark.png" width="36" height="36" alt=""><span>BETA <span class="brand-name">日历</span></span></a>
     <nav aria-label="主要导航"><a href="index.html"><i data-lucide="radio"></i>订阅日历</a><a href="events.html">活动列表</a></nav>
-    <div class="account"><button id="roles-open" hidden><i data-lucide="users"></i>权限</button><a id="login" href="/login">登录</a><span id="account-name"></span><button id="logout" class="icon" title="退出登录" aria-label="退出登录" hidden><i data-lucide="log-out"></i></button></div>
+    <div class="account"><a id="login" href="/login">登录</a><span id="account-name"></span><button id="logout" title="退出登录" aria-label="退出登录" hidden><i data-lucide="log-out"></i>退出</button></div>
   </header>
   <main>
     <div class="page-heading"><div><p class="eyebrow">BETA STUDENT DEVELOPMENT COMMITTEE</p><h1>成员日历</h1></div><div><button id="resume" hidden><i data-lucide="refresh-cw"></i>检查发布状态</button><button id="create" class="primary" hidden><i data-lucide="plus"></i>新增活动</button></div></div>
@@ -76,11 +77,6 @@
       <p id="form-error" role="alert"></p>
       <footer class="panel-actions"><button type="button" id="delete" class="danger" hidden><i data-lucide="trash-2"></i>删除</button><button type="button" id="edit" hidden><i data-lucide="pencil"></i>编辑</button><button type="submit" id="save" class="primary" hidden><i data-lucide="check"></i>保存并发布</button></footer>
     </form>
-  </dialog>
-  <dialog id="roles" aria-labelledby="roles-title">
-    <div class="panel-header"><h2 id="roles-title">编辑权限</h2><button id="roles-close" class="icon" aria-label="关闭" title="关闭"><i data-lucide="x"></i></button></div>
-    <div id="role-list"></div>
-    <form id="role-form"><label>已有账号 ID<input name="userId" required type="number" min="1"></label><label>角色<select name="role"><option value="editor">编辑者</option><option value="viewer">查看者</option><option value="admin">管理员</option></select></label><button class="primary">保存授权</button><p id="role-error" role="alert"></p></form>
   </dialog>
 </body>
 </html>
