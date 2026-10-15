@@ -24,9 +24,20 @@ class CalendarDeployTest(unittest.TestCase):
         self.assertIn("server_name register.betasdc.duckdns.org;", configured)
         self.assertEqual(configured.count("include /etc/betasdc/calendar.nginx.conf;"), 1)
         self.assertIn("client_max_body_size 32k;", configured)
-        self.assertEqual(configured.count("allow 10.17.0.0/18;"), 1)
+        self.assertEqual(configured.count("allow 10.16.112.0/20;"), 1)
+        self.assertNotIn("allow 10.17.0.0/18;", configured)
         with self.assertRaises(ValueError):
             module.configure("unrecognized layout")
+
+    def test_calendar_host_has_no_ip_whitelist_and_preserves_other_checks(self):
+        config = (ROOT / "deploy/calendar.nginx.conf").read_text()
+        self.assertIn("allow all;", config)
+        self.assertNotIn("deny all;", config)
+        self.assertNotIn("allow 10.", config)
+        self.assertIn('if ($http_host != "calendar.betasdc.duckdns.org")', config)
+        self.assertIn("ssl_protocols TLSv1.2 TLSv1.3;", config)
+        self.assertIn("limit_conn connections 10;", config)
+        self.assertIn("client_max_body_size 32k;", config)
 
     def test_wheel_manifest_checks_content_and_requirements(self):
         module = load("wheels")

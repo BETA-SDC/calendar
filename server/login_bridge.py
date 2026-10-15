@@ -7,6 +7,7 @@ import stat
 REGISTRATION_HOST = "register.betasdc.duckdns.org"
 CALENDAR_HOST = "calendar.betasdc.duckdns.org"
 CAMPUS_NETWORKS = ("10.16.112.0/20", "10.17.0.0/18", "10.17.128.0/18")
+CALENDAR_NETWORKS = ("0.0.0.0/0", "::/0")
 KEY_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 

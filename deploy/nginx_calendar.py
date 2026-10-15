@@ -3,11 +3,6 @@ from pathlib import Path
 import sys
 
 def configure(content):
-    if "        allow 10.17.0.0/18;" not in content:
-        anchor = "        allow 10.16.112.0/20;"
-        if content.count(anchor) != 1:
-            raise ValueError("Unexpected campus network policy; inspect before changing.")
-        content = content.replace(anchor, anchor + "\n        allow 10.17.0.0/18;")
     marker = "        location ^~ /api/calendar/ {"
     if marker not in content:
         anchor = "        location / {"

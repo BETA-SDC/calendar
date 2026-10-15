@@ -49,12 +49,14 @@ npm test
 beta 集成入口是 `calendar_service.beta_entry:create_app()`。
 安装时把本仓库 `server/` 作为 `calendar_service` 包提供，原有
 `server.registration` 仍从 `/opt/betasdc` 导入，避免模块名冲突。
-该工厂在日历域名上直接承载登录页面和登录 API；账号数据库、校园网络限制
-和 CSRF 校验复用原服务。日历域名使用独立会话密钥，避免复制账号站点密钥。
+该工厂在日历域名上直接承载登录页面和登录 API；账号数据库和 CSRF 校验
+复用原服务。日历域名使用独立会话密钥，避免复制账号站点密钥。
 
 正式入口使用 `https://calendar.betasdc.duckdns.org/`，根路径跳转到日历。
-Nginx 和应用层统一允许已确认的校园网段：`10.16.112.0/20`、
-`10.17.0.0/18`、`10.17.128.0/18`；不泛化为全部内网或公网。
+日历域名不限制来源网段：Nginx 显式 `allow all`，应用网络配置接受全部
+IPv4／IPv6 地址。仍要求 HTTPS、正确域名、成员登录及有效的写入权限和 CSRF；
+连接限制、请求大小限制、登录尝试限制与来源校验保留。
+注册站点的校园网策略不变，部署脚本不会修改其现有 Nginx 白名单。
 注册和邮箱验证仍固定跳转到 `https://register.betasdc.duckdns.org/`，
 日历域名只提供登录、账户状态和成员日历。注册站点继续作为专门的账号
 入口，已有账号可直接在日历域名登录。GitHub 登录继续由原注册站点提供，
@@ -134,7 +136,8 @@ worker 每 60 秒检查仓库其他入口的提交，使用同一文件锁校验
 ## beta 部署
 
 目标地址是 `https://calendar.betasdc.duckdns.org/`，
-沿用原站点的校园网访问范围。服务必须由 root 安装，普通 `jet` 用户
+日历域名不设来源网段白名单；主机路由、防火墙和 DNS 是否外部可达仍需另行确认。
+服务必须由 root 安装，普通 `jet` 用户
 无法修改现有 `/opt/betasdc` 或 systemd 配置。
 
 使用仅授权 `BETA-SDC/calendar` 的专用可写 Deploy Key。
@@ -164,7 +167,8 @@ sudo sh deploy/install.sh auto /secure/calendar-deploy-key /secure/github-known-
 3. 配置 `/var/lib/betasdc-calendar`、专用凭据、worker 和登录服务 drop-in。
 4. 自动选择或创建管理员，首次同步构建站点。
 5. 给原站点 `/api/calendar/` 增加 32 KiB 请求上限，并安装独立日历域名
-   的 Nginx 配置，沿用现有通配符证书和校园网限制；测试配置后重载。
+   的 Nginx 配置，沿用现有通配符证书，取消日历域名的网段限制，
+   保持注册域名网络策略不变；测试配置后重载。
 6. 启动 worker，并重启登录服务。
 
 安装前检查：Python 3.12 venv 可用，离线包齐全，beta 可访问 GitHub，

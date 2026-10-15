@@ -5,10 +5,16 @@ import unittest
 
 from flask import Flask
 
-from server.login_bridge import CALENDAR_HOST, CAMPUS_NETWORKS, HostRouter, REGISTRATION_HOST, private_key
+from server.login_bridge import CALENDAR_HOST, CALENDAR_NETWORKS, CAMPUS_NETWORKS, HostRouter, REGISTRATION_HOST, private_key
 
 
 class CalendarLoginTest(unittest.TestCase):
+    def test_calendar_network_policy_accepts_any_ipv4_or_ipv6_address(self):
+        networks = [ipaddress.ip_network(value) for value in CALENDAR_NETWORKS]
+        for address in ("10.17.7.116", "10.26.79.1", "192.168.1.1", "203.0.113.1",
+                        "127.0.0.1", "2001:db8::1234", "::1"):
+            self.assertTrue(any(ipaddress.ip_address(address) in network for network in networks), address)
+
     def test_confirmed_campus_subnet_without_broad_private_network_access(self):
         networks = [ipaddress.ip_network(value) for value in CAMPUS_NETWORKS]
         def allowed(value):
