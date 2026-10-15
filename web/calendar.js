@@ -7,13 +7,16 @@
   const preferences = CalendarPreferences;
   let settings = preferences.normalize(null);
   try { settings = preferences.normalize(JSON.parse(localStorage.getItem("beta-calendar-preferences"))); } catch {}
+  const memberCategories = [...settings.categories];
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   function applyAppearance() {
     document.body.dataset.theme = preferences.theme(settings.theme, media.matches);
     document.body.dataset.density = settings.density;
   }
   function saveSettings() {
-    try { localStorage.setItem("beta-calendar-preferences", JSON.stringify(settings)); } catch {}
+    try { localStorage.setItem("beta-calendar-preferences", JSON.stringify({
+      ...settings, categories: guestMode ? memberCategories : settings.categories,
+    })); } catch {}
   }
   applyAppearance();
   media.addEventListener("change", applyAppearance);
@@ -23,6 +26,8 @@
   let events = [];
   let capability = { role: "viewer", canEdit: false, user: null };
   let apiMode = false;
+  let guestMode = false;
+  let activeCategories = preferences.categories;
   let csrf = "";
   let selected = null;
   let saving = false;
@@ -92,7 +97,7 @@
       const count = available.filter((event) => preferences.categoryId(event) === category.id).length;
       $(`[data-count="${category.id}"]`).textContent = String(count);
     }
-    $("#filter-summary").textContent = `已选 ${settings.categories.length} / 4 类`;
+    $("#filter-summary").textContent = `已选 ${settings.categories.filter((id) => activeCategories.some((category) => category.id === id)).length} / ${activeCategories.length} 类`;
   }
   function badges(event) {
     const result = node("div", "", "badges");
@@ -123,8 +128,8 @@
     updateCategories();
   }
   function refresh() {
-    $("#access-form").hidden = unlocked || !isRestricted();
-    $("#access-lock").hidden = !unlocked || Boolean(capability.user);
+    $("#access-form").hidden = apiMode || unlocked || !isRestricted();
+    $("#access-lock").hidden = apiMode || !unlocked;
     for (const source of calendar.getEventSources()) source.remove();
     for (const category of preferences.categories) {
       calendar.addEventSource({
@@ -139,7 +144,8 @@
       });
     }
     renderAgenda();
-    if (!unlocked && isRestricted()) message("只读 · 受限分类尚未解锁");
+    if (guestMode) message("游客 · 只读");
+    else if (!unlocked && isRestricted()) message("只读 · 受限分类尚未解锁");
     else message(apiMode ? (capability.canEdit ? "可编辑" : "只读") : "只读");
   }
 
@@ -217,8 +223,8 @@
     calendar.updateSize();
   });
   $("#categories-all").addEventListener("click", () => {
-    settings.categories = preferences.categories.map((category) => category.id);
-    for (const input of $("#category-list").querySelectorAll("input")) input.checked = true;
+    settings.categories = activeCategories.map((category) => category.id);
+    for (const input of $("#category-list").querySelectorAll("input")) input.checked = settings.categories.includes(input.value);
     saveSettings();
     refresh();
   });
@@ -247,6 +253,7 @@
   $("#search").addEventListener("input", refresh);
   $("#access-form").addEventListener("submit", (event) => {
     event.preventDefault();
+    if (apiMode) return;
     if ($("#access-password").value !== "betasdc") { message("密码不正确。", true); return; }
     unlocked = true;
     try { sessionStorage.setItem("beta-calendar-unlocked", "true"); } catch {}
@@ -445,11 +452,21 @@
         capability = await request("/session");
         csrf = capability.csrf_token;
         apiMode = true;
-        if (capability.user) unlocked = true;
+        guestMode = !capability.user;
+        unlocked = Boolean(capability.user);
+        if (guestMode) {
+          activeCategories = preferences.categories.filter((category) => category.id === "public-planned");
+          settings.categories = ["public-planned"];
+          for (const input of $("#category-list").querySelectorAll("input")) {
+            input.checked = input.value === "public-planned";
+            input.closest("label").hidden = input.value !== "public-planned";
+          }
+        }
       }
+      $("h1").textContent = guestMode ? "公开日历" : "成员日历";
+      $("#account-name").textContent = capability.user?.username || (guestMode ? "游客" : "");
       $("#login").hidden = !apiMode || Boolean(capability.user);
       $("#login").href = capability.loginUrl || "/login";
-      $("#account-name").textContent = capability.user?.username || "";
       $("#logout").hidden = !apiMode || !capability.user;
       $("#create").hidden = !capability.canEdit;
       if (capability.user) {

@@ -66,10 +66,12 @@ def register_calendar(app, *, state, current_user, csrf_token):
         except (FileNotFoundError, json.JSONDecodeError):
             abort(503, description="日历正在同步，请稍后重试。")
 
+    def public_planned(event):
+        return event["scope"] == "public" and event["status"] == "planned"
+
     @api.get("/events")
     def read_events():
-        if app.config.get("CALENDAR_MEMBERS_ONLY") and not user():
-            abort(401, description="请先使用成员账号登录。")
+        account = user()
         items = events()
         for key in ("start", "end"):
             if request.args.get(key):
@@ -85,9 +87,11 @@ def register_calendar(app, *, state, current_user, csrf_token):
         last = local_date(request.args["end"]) if request.args.get("end") else None
         if first and last and first >= last:
             abort(422, description="结束日期须晚于开始日期。")
-        role = store.role(user()["id"]) if user() else "viewer"
+        role = store.role(account["id"]) if account else "viewer"
         result = []
         for event in items:
+            if not account and not public_planned(event):
+                continue
             start = local_date(event["start"])
             end = local_date(event["end"]) if event["end"] else start
             if last and start >= last:
@@ -164,12 +168,23 @@ def register_calendar(app, *, state, current_user, csrf_token):
         return send_from_directory(state / "current", asset)
 
     @pages.before_request
-    def member_pages():
-        if not app.config.get("CALENDAR_MEMBERS_ONLY") or user():
+    def guest_pages():
+        if user():
             return None
-        asset = request.view_args.get("asset", "") if request.view_args else ""
-        if asset not in {"calendar.css", "login.css", "login.js", "calendar-account.js", "mark.png"}:
-            return redirect("/login")
+        asset = (request.view_args or {}).get("asset", "calendar.html")
+        if asset in {"index.html", "events.html"}:
+            return redirect("/calendar/")
+        if asset in {"calendar.html", "calendar-config.json", "calendar.css", "workspace.css",
+                     "calendar.js", "calendar-preferences.js", "calendar-account.js",
+                     "login.css", "login.js", "mark.png"}:
+            return None
+        if asset in {"vendor/fullcalendar.js", "vendor/fullcalendar-locales.js",
+                     "vendor/fullcalendar-luxon.js", "vendor/luxon.js", "vendor/lucide.js"}:
+            return None
+        if asset.endswith(".ics") and any(
+                public_planned(event) and event.get("path") == asset for event in events()):
+            return None
+        abort(404)
 
     @pages.get("/calendar/calendar-config.json")
     def calendar_config():
@@ -179,11 +194,17 @@ def register_calendar(app, *, state, current_user, csrf_token):
     # Limit the host CSP relaxation to calendar documents, never account pages.
     @pages.after_request
     def calendar_headers(response):
+        response.headers["Cache-Control"] = "no-store"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
             "base-uri 'none'; form-action 'self'"
         )
+        return response
+
+    @api.after_request
+    def private_api(response):
+        response.headers["Cache-Control"] = "no-store"
         return response
 
     app.register_blueprint(api)

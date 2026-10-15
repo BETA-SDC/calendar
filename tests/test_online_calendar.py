@@ -89,21 +89,44 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/calendar/roles").status_code, 404)
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 202)
 
-    def test_beta_member_read_gate_and_public_pages_compatibility(self):
-        self.assertEqual(self.client.get("/api/calendar/events").status_code, 200)
-        self.app.config["CALENDAR_MEMBERS_ONLY"] = True
-        self.assertEqual(self.client.get("/calendar/").location, "/login")
-        self.assertEqual(self.client.get("/calendar/events-data.json").location, "/login")
-        self.assertEqual(self.client.get("/api/calendar/events").status_code, 401)
+    def test_guests_only_read_public_planned_events_and_members_read_all(self):
+        response = self.client.get("/api/calendar/events")
+        expected = [event for event in self.data()
+                    if event["scope"] == "public" and event["status"] == "planned"]
+        self.assertEqual({event["uid"] for event in response.json["events"]},
+                         {event["uid"] for event in expected})
+        self.assertTrue(all(not any(event["actions"].values()) for event in response.json["events"]))
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        with self.client.get("/calendar/") as page:
+            self.assertEqual(page.status_code, 200)
+        self.assertEqual(self.client.get("/calendar/events-data.json").status_code, 404)
         self.assertEqual(self.client.get("/api/calendar/session").status_code, 200)
-        for asset in ("calendar.css", "login.css", "login.js", "calendar-account.js", "mark.png"):
+        for asset in ("calendar.css", "workspace.css", "calendar.js", "calendar-preferences.js",
+                      "login.css", "login.js", "calendar-account.js", "mark.png"):
             with self.client.get("/calendar/" + asset) as response:
                 self.assertEqual(response.status_code, 200)
         self.login(3)
-        self.assertEqual(self.client.get("/api/calendar/events").status_code, 200)
+        self.assertEqual(len(self.client.get("/api/calendar/events").json["events"]), len(self.data()))
         with self.client.get("/calendar/") as response:
             self.assertEqual(response.status_code, 200)
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 403)
+
+    def test_guest_cannot_bypass_filter_through_static_files_or_write(self):
+        for asset in ("events-data.json", "server-events.json", "revision.json", "all.ics",
+                      "public.ics", "internal.ics", "tentative.ics"):
+            self.assertEqual(self.client.get("/calendar/" + asset).status_code, 404, asset)
+        for event in self.data():
+            with self.client.get("/calendar/" + event["path"]) as response:
+                allowed = event["scope"] == "public" and event["status"] == "planned"
+                self.assertEqual(response.status_code, 200 if allowed else 404, event["path"])
+        self.client.get("/api/calendar/session")
+        self.assertEqual(self.send("POST", "/events", self.payload).status_code, 401)
+        self.assertEqual(self.client.get("/api/calendar/jobs/anything").status_code, 401)
+        self.assertEqual(self.client.get("/calendar/index.html").location, "/calendar/")
+        self.assertEqual(self.client.get("/calendar/events.html").location, "/calendar/")
+        self.login(3)
+        with self.client.get("/calendar/events-data.json") as response:
+            self.assertEqual(response.status_code, 200)
 
     def test_job_ownership_and_revoked_permissions(self):
         self.login(1)

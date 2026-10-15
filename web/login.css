@@ -1,1 +1,2 @@
 .login-page{max-width:440px;margin:56px auto;padding:24px}.login-page h1{font-size:26px;margin-bottom:28px}.login-page button{width:100%;margin-top:18px}.register-link{margin-top:24px;font-size:13px;color:#647269}#login-error{color:#aa3030;font-size:13px;line-height:1.7;min-height:24px}@media(max-width:600px){.login-page{margin:24px auto;padding:24px}.site-header nav a:last-child{display:flex}}
+.guest-link{margin-top:20px;text-align:center}

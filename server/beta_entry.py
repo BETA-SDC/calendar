@@ -18,7 +18,6 @@ def create_app():
         "REGISTRATION_NETWORKS": CALENDAR_NETWORKS,
         "SECRET_KEY": private_key(state / "calendar.session-key"),
         "GITHUB_CLIENT_ID": "",
-        "CALENDAR_MEMBERS_ONLY": True,
     })
 
     def current_user():
