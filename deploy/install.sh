@@ -21,7 +21,7 @@ if test -f /etc/systemd/system/betasdc-calendar.service; then cp /etc/systemd/sy
 cp /etc/betasdc/nginx.conf "$backup/nginx.conf"
 mkdir -p "$install_root"
 # Copy tracked sources only; never copy a developer's venv or generated site.
-git -C "$source_dir" archive HEAD | tar -x -C "$install_root"
+git -c safe.directory="$source_dir" -C "$source_dir" archive HEAD | tar -x -C "$install_root"
 ln -sfn server "$install_root/calendar_service"
 python3 -m venv "$install_root/.venv"
 "$install_root/.venv/bin/pip" install -r "$install_root/requirements-server.txt" gunicorn==23.0.0
