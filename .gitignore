@@ -5,3 +5,5 @@
 /output/
 /site/
 __pycache__/
+node_modules/
+/work/

@@ -484,7 +484,7 @@ def command_shift(args: argparse.Namespace) -> None:
         start=format_dt(start + delta), end=format_dt(event.decoded("DTEND") + delta),
         title=None, location=None, status=None, alarm_minutes=None, clear_alarms=False,
         duration_minutes=None, duration_days=None,
-        description=None, url=None,
+        description=None, url=None, scope=None,
     )
     command_update(updated)
 
@@ -636,8 +636,15 @@ def command_update(args: argparse.Namespace) -> None:
         event["SUMMARY"] = args.title
         changed = True
     if args.location is not None:
-        require_bilingual(args.location, "--location")
-        event["LOCATION"] = args.location
+        if args.location:
+            require_bilingual(args.location, "--location")
+            event["LOCATION"] = args.location
+        else:
+            event.pop("LOCATION", None)
+        changed = True
+    if args.scope is not None:
+        brand = "BETA" if args.scope == "public" else "BETA-SDC"
+        calendar["X-WR-CALNAME"] = f"{brand} {SCOPE_LABELS[args.scope]}"
         changed = True
     for argument, property_name in (("description", "DESCRIPTION"), ("url", "URL")):
         value = getattr(args, argument)
@@ -675,9 +682,9 @@ def command_update(args: argparse.Namespace) -> None:
     event["LAST-MODIFIED"] = vDDDTypes(stamp)
     new_start = event.decoded("DTSTART")
     target = path
-    if args.start:
+    if args.start or args.scope is not None:
         target = event_path(
-            path.relative_to(root).parts[0],
+            args.scope or path.relative_to(root).parts[0],
             new_start,
             path.stem.split("-", 3)[-1],
             root,
@@ -800,7 +807,7 @@ def parser() -> argparse.ArgumentParser:
     shift_parser.add_argument("identifier")
     shift_parser.add_argument("--days", type=int, default=0)
     shift_parser.add_argument("--minutes", type=int, default=0)
-    shift_parser.set_defaults(handler=command_shift)
+    shift_parser.set_defaults(handler=command_shift, scope=None)
 
     show_parser = subparsers.add_parser("show", parents=[common])
     show_parser.add_argument("identifier", help="UID, filename, or repository-relative path")
@@ -852,9 +859,10 @@ def parser() -> argparse.ArgumentParser:
         update_parser.add_argument("--description", help="replace event notes")
         update_parser.add_argument("--url", help="replace source issue or event URL")
         if name == "update":
+            update_parser.add_argument("-s", "--scope", choices=("public", "internal"))
             update_parser.add_argument("--status", choices=tuple(STATUS_LABELS))
         else:
-            update_parser.set_defaults(status="planned")
+            update_parser.set_defaults(status="planned", scope=None)
         alarm_group = update_parser.add_mutually_exclusive_group()
         alarm_group.add_argument("--alarm-minutes", type=int)
         alarm_group.add_argument("--clear-alarms", action="store_true")

@@ -26,7 +26,10 @@ STATUS_LABELS = {
 }
 REFRESH_INTERVAL = "PT1H"
 BASE_URL = "https://beta-sdc.github.io/calendar"
-WEB_ASSETS = ("index.html", "events.html", "styles.css", "access.js", "app.js", "events.js")
+WEB_ASSETS = (
+    "index.html", "events.html", "styles.css", "access.js", "app.js", "events.js",
+    "calendar.html", "calendar.css", "calendar.js", "mark.png",
+)
 
 
 @dataclass(frozen=True)
@@ -191,6 +194,7 @@ def copy_web_assets(output: Path, web_root: Path) -> None:
         if not source.is_file():
             raise FileNotFoundError(f"missing web asset: {source}")
         shutil.copy2(source, output / filename)
+    shutil.copytree(web_root / "vendor", output / "vendor", dirs_exist_ok=True)
 
 
 def copy_source_events(
@@ -246,6 +250,8 @@ def serialize_event(entry: SourceEvent, source_root: Path) -> dict[str, Any]:
         "location": str(entry.event.get("LOCATION", "")).strip(),
         "url": f"{BASE_URL}/{relative_path.as_posix()}",
         "filename": relative_path.name,
+        "description": str(entry.event.get("DESCRIPTION", "")),
+        "sourceUrl": str(entry.event.get("URL", "")),
     }
 
 
@@ -395,6 +401,7 @@ def build_site(
     copy_source_events(output, all_entries, source_root)
     write_calendar_data(output, feeds, group_by_month(all_entries), include_restricted)
     write_event_data(output, all_entries, source_root, include_restricted)
+    (output / "calendar-config.json").write_text('{"api":false}\n', encoding="utf-8")
 
 
 def main() -> None:

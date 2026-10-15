@@ -14,6 +14,14 @@ Single-event page:
 
 https://beta-sdc.github.io/calendar/events.html
 
+Calendar view (day, week, month, quarter, year):
+
+https://beta-sdc.github.io/calendar/calendar.html
+
+The FullCalendar page is read-only on Pages and supports authenticated editing
+when integrated with the beta login service. See [在线日历部署](docs/online-calendar.md)
+for roles, API contracts, the publication worker, installation, and rollback.
+
 ## Repository layout
 
 ```text
@@ -249,7 +257,7 @@ Install dependencies, run the tests, and build the same output used by
 GitHub Pages:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-server.txt
 python -m unittest discover -s tests -v
 python scripts/build_feeds.py --output site
 ```

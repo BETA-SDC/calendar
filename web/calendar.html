@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BETA 日历</title>
+  <link rel="icon" href="mark.png" type="image/png">
+  <link rel="stylesheet" href="calendar.css">
+  <script src="vendor/luxon.js" defer></script>
+  <script src="vendor/fullcalendar.js" defer></script>
+  <script src="vendor/fullcalendar-locales.js" defer></script>
+  <script src="vendor/fullcalendar-luxon.js" defer></script>
+  <script src="vendor/lucide.js" defer></script>
+  <script src="calendar.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="calendar.html"><img src="mark.png" width="36" height="36" alt=""><span>BETA <span class="brand-name">日历</span></span></a>
+    <nav aria-label="主要导航"><a href="index.html"><i data-lucide="radio"></i>订阅日历</a><a href="events.html">活动列表</a></nav>
+    <div class="account"><button id="roles-open" hidden><i data-lucide="users"></i>权限</button><a id="login" href="/login">登录</a><span id="account-name"></span></div>
+  </header>
+  <main>
+    <div class="page-heading"><div><p class="eyebrow">BETA STUDENT DEVELOPMENT COMMITTEE</p><h1>日历</h1></div><div><button id="resume" hidden><i data-lucide="refresh-cw"></i>检查发布状态</button><button id="create" class="primary" hidden><i data-lucide="plus"></i>新增活动</button></div></div>
+    <section class="calendar-workspace" aria-label="日历">
+      <div class="toolbar">
+        <div class="navigation"><button id="today">今天</button><button id="prev" class="icon" title="上一期" aria-label="上一期"><i data-lucide="chevron-left"></i></button><button id="next" class="icon" title="下一期" aria-label="下一期"><i data-lucide="chevron-right"></i></button><h2 id="period-title"></h2></div>
+        <div id="views" class="segments" role="group" aria-label="日历视图">
+          <button data-view="dayGridDay" aria-pressed="false">日</button><button data-view="dayGridWeek" aria-pressed="false">周</button><button data-view="dayGridMonth" aria-pressed="true">月</button><button data-view="quarter" aria-pressed="false">季</button><button data-view="multiMonthYear" aria-pressed="false">年</button>
+        </div>
+      </div>
+      <div class="filters">
+        <label class="search"><i data-lucide="search"></i><input id="search" type="search" placeholder="搜索活动、地点" aria-label="搜索活动、地点"></label>
+        <label>范围<select id="scope"><option value="public">公开活动</option><option value="internal">内部事件</option><option value="all">全部活动</option></select></label>
+        <label>状态<select id="planning-status"><option value="planned">计划事件</option><option value="tentative">待定事件</option><option value="all">全部状态</option></select></label>
+        <span class="timezone">北京时间 · UTC+8</span>
+      </div>
+      <form id="access-form" class="access-bar" hidden>
+        <label for="access-password">访问密码</label><input id="access-password" type="password" autocomplete="current-password" required><button>解锁</button>
+      </form>
+      <button id="access-lock" class="lock" hidden><i data-lucide="lock-keyhole"></i>锁定受限活动</button>
+      <p id="status" role="status" aria-live="polite">正在加载日历…</p>
+      <div class="workspace-body"><div class="calendar-scroll"><div id="calendar"></div></div>
+        <aside class="agenda" aria-label="本期活动"><div class="agenda-heading"><h3>本期活动</h3><span id="event-count">0</span></div><div id="agenda"></div></aside>
+      </div>
+      <footer class="legend"><span><b class="dot public"></b>公开活动</span><span><b class="dot internal"></b>内部事件</span><span><b class="dot tentative"></b>待定</span></footer>
+    </section>
+  </main>
+  <dialog id="editor" aria-labelledby="editor-title">
+    <form id="event-form">
+      <header class="panel-header"><h2 id="editor-title">活动详情</h2><button type="button" id="editor-close" class="icon" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button></header>
+      <div id="detail"></div>
+      <fieldset id="fields" hidden>
+        <label>中文标题<input name="titleZh" required maxlength="250"></label>
+        <label>English Title<input name="titleEn" required maxlength="250"></label>
+        <div class="field-row"><label>范围<select name="scope"><option value="public">公开活动</option><option value="internal">内部事件</option></select></label><label>状态<select name="status"><option value="planned">计划事件</option><option value="tentative">待定事件</option></select></label></div>
+        <label class="checkbox"><input type="checkbox" name="allDay">全天</label>
+        <div class="field-row"><label>开始<input name="start" type="datetime-local" required></label><label>结束<input name="end" type="datetime-local" required><small id="end-note"></small></label></div>
+        <label>中文地点<input name="locationZh" maxlength="250"></label>
+        <label>English Location<input name="locationEn" maxlength="250"></label>
+        <label>说明<textarea name="description" rows="4" maxlength="12000"></textarea></label>
+        <label>来源链接<input name="sourceUrl" type="url" maxlength="2000"></label>
+        <div class="field-row"><label>提醒<select name="alarmMode"><option value="keep">保留现有提醒</option><option value="set">设置提醒</option><option value="clear">无提醒</option></select></label><label id="alarm-value" hidden>提前分钟<input name="alarmMinutes" type="number" min="0" max="525600" value="10"></label></div>
+      </fieldset>
+      <p id="form-error" role="alert"></p>
+      <footer class="panel-actions"><button type="button" id="delete" class="danger" hidden><i data-lucide="trash-2"></i>删除</button><button type="button" id="edit" hidden><i data-lucide="pencil"></i>编辑</button><button type="submit" id="save" class="primary" hidden><i data-lucide="check"></i>保存并发布</button></footer>
+    </form>
+  </dialog>
+  <dialog id="roles" aria-labelledby="roles-title">
+    <div class="panel-header"><h2 id="roles-title">编辑权限</h2><button id="roles-close" class="icon" aria-label="关闭" title="关闭"><i data-lucide="x"></i></button></div>
+    <div id="role-list"></div>
+    <form id="role-form"><label>已有账号 ID<input name="userId" required type="number" min="1"></label><label>角色<select name="role"><option value="editor">编辑者</option><option value="viewer">查看者</option><option value="admin">管理员</option></select></label><button class="primary">保存授权</button><p id="role-error" role="alert"></p></form>
+  </dialog>
+</body>
+</html>

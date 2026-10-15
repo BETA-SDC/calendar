@@ -1,0 +1,14 @@
+[Unit]
+Description=Read-only BETA calendar preview (SSH access)
+
+[Service]
+WorkingDirectory=/home/jet/betasdc-calendar-stage
+ExecStart=/usr/bin/python3 -m http.server 18766 --bind 127.0.0.1 --directory /home/jet/betasdc-calendar-stage/site
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

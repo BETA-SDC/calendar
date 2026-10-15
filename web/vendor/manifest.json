@@ -1,0 +1,10 @@
+{
+  "fullcalendar.js": "223ff800a0b0b87a1c96c1d127a9a981434e14f88a7b1662fecade17c78ea203",
+  "fullcalendar-locales.js": "d61d2f1f79d163dc5ade865ef825ec7ded1b9774b1ef67dceaea61c2bf91e5d1",
+  "fullcalendar-luxon.js": "d7c6de7fc0eed5bebd7ef9f429342293abca0cb2aa92e0aeaaabaf14549cbed7",
+  "luxon.js": "516c5fea5c82bdf1fb5c472b9aafdca9cda6dc806b2c12ce9d62c2e0fc348104",
+  "lucide.js": "3411692820cb8d47543f69496aa25fd603a358f4498046f41c508a5a3342210e",
+  "LICENSE.fullcalendar": "4c0b0dae26c99e3b11be70b990a703be4deb75e21884104582e0e217786d3209",
+  "LICENSE.luxon": "6cb2f2bf697ee9c6fa9eb8f227c63ee6e7a3cba42d4717f14c745ef9b6cbc006",
+  "LICENSE.lucide": "1e7290b35280a048667bbf0ebabac1c7fd52a75300e8b2946ac165715997f2bc"
+}

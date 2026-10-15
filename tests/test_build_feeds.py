@@ -136,8 +136,16 @@ class BuildFeedsTest(unittest.TestCase):
             "events.js",
             "calendar-data.json",
             "events-data.json",
+            "calendar.html",
+            "calendar.js",
+            "calendar.css",
+            "calendar-config.json",
+            "vendor/fullcalendar.js",
+            "vendor/fullcalendar-luxon.js",
+            "vendor/LICENSE.fullcalendar",
         ):
             self.assertTrue((self.output / filename).is_file(), filename)
+        self.assertEqual(json.loads((self.output / "calendar-config.json").read_text()), {"api": False})
 
         data = json.loads((self.output / "calendar-data.json").read_text(encoding="utf-8"))
         self.assertEqual(

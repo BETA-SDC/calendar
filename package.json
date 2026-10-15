@@ -1,0 +1,14 @@
+{
+  "name": "beta-sdc-calendar",
+  "private": true,
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "check": "node --check web/calendar.js && node --check scripts/vendor.mjs"
+  },
+  "dependencies": {
+    "fullcalendar": "6.1.19",
+    "@fullcalendar/luxon3": "6.1.19",
+    "luxon": "3.7.2",
+    "lucide": "0.468.0"
+  }
+}

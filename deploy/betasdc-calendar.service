@@ -1,0 +1,36 @@
+[Unit]
+Description=BETA calendar Git publication worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=betasdc
+Group=www-data
+WorkingDirectory=/opt/betasdc-calendar
+StateDirectory=betasdc-calendar
+StateDirectoryMode=0700
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=CALENDAR_STATE=/var/lib/betasdc-calendar
+EnvironmentFile=/etc/betasdc/calendar.env
+ExecStart=/opt/betasdc-calendar/.venv/bin/python -m calendar_service.worker
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=150
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+MemoryMax=512M
+TasksMax=48
+ReadWritePaths=/var/lib/betasdc-calendar
+
+[Install]
+WantedBy=multi-user.target
