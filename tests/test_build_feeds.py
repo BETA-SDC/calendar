@@ -139,6 +139,8 @@ class BuildFeedsTest(unittest.TestCase):
             "calendar.html",
             "calendar.js",
             "calendar.css",
+            "workspace.css",
+            "calendar-preferences.js",
             "calendar-config.json",
             "vendor/fullcalendar.js",
             "vendor/fullcalendar-luxon.js",

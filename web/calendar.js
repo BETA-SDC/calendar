@@ -4,6 +4,19 @@
   const $ = (selector) => document.querySelector(selector);
   const DateTime = luxon.DateTime;
   const zone = "Asia/Shanghai";
+  const preferences = CalendarPreferences;
+  let settings = preferences.normalize(null);
+  try { settings = preferences.normalize(JSON.parse(localStorage.getItem("beta-calendar-preferences"))); } catch {}
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  function applyAppearance() {
+    document.body.dataset.theme = preferences.theme(settings.theme, media.matches);
+    document.body.dataset.density = settings.density;
+  }
+  function saveSettings() {
+    try { localStorage.setItem("beta-calendar-preferences", JSON.stringify(settings)); } catch {}
+  }
+  applyAppearance();
+  media.addEventListener("change", applyAppearance);
   const editor = $("#editor");
   const form = $("#event-form");
   const field = (name) => form.elements.namedItem(name);
@@ -60,16 +73,26 @@
     return body;
   }
   function isRestricted() {
-    return $("#scope").value === "internal" || $("#planning-status").value !== "planned";
+    return settings.categories.some((id) => id !== "public-planned");
   }
   function visibleEvents() {
     const query = $("#search").value.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    if (!unlocked && isRestricted()) return [];
-    return events.filter((event) =>
-      ($("#scope").value === "all" || event.scope === $("#scope").value)
-      && ($("#planning-status").value === "all" || event.status === $("#planning-status").value)
-      && (unlocked || !event.requiresKey)
-      && query.every((term) => `${event.title} ${event.location} ${event.description || ""}`.toLowerCase().includes(term)));
+    return events.filter((event) => (unlocked || !event.requiresKey)
+      && preferences.matches(event, settings.categories, query.join(" ")));
+  }
+  function periodEvents() {
+    const start = dt(calendar.view.currentStart.toISOString());
+    const end = dt(calendar.view.currentEnd.toISOString());
+    return events.filter((event) => (unlocked || !event.requiresKey) && dt(event.start) < end
+      && (event.end ? dt(event.end) > start : dt(event.start) >= start));
+  }
+  function updateCategories() {
+    const available = periodEvents();
+    for (const category of preferences.categories) {
+      const count = available.filter((event) => preferences.categoryId(event) === category.id).length;
+      $(`[data-count="${category.id}"]`).textContent = String(count);
+    }
+    $("#filter-summary").textContent = `已选 ${settings.categories.length} / 4 类`;
   }
   function badges(event) {
     const result = node("div", "", "badges");
@@ -88,7 +111,7 @@
     $("#agenda").replaceChildren();
     $("#event-count").textContent = String(visible.length);
     for (const event of visible) {
-      const button = node("button", "", "agenda-item");
+      const button = node("button", "", `agenda-item category-${preferences.categoryId(event)}`);
       const [zh, en] = split(event.title);
       button.append(node("p", dt(event.start).setLocale("zh-CN").toFormat("M月d日 cccc"), "agenda-date"),
         node("p", zh, "agenda-title"), node("p", en, "english"),
@@ -97,19 +120,25 @@
       $("#agenda").append(button);
     }
     if (!visible.length) $("#agenda").append(node("p", "本期暂无活动", "empty"));
+    updateCategories();
   }
   function refresh() {
     $("#access-form").hidden = unlocked || !isRestricted();
-    $("#access-lock").hidden = !unlocked;
-    calendar.removeAllEvents();
-    calendar.addEventSource(visibleEvents().map((event) => ({
-      id: event.uid, title: event.title, start: event.start, end: event.end,
-      allDay: event.allDay, extendedProps: { source: event },
-      classNames: [`event-${event.scope}`, `event-${event.status}`],
-      editable: capability.canEdit && !event.recurring,
-    })));
+    $("#access-lock").hidden = !unlocked || Boolean(capability.user);
+    for (const source of calendar.getEventSources()) source.remove();
+    for (const category of preferences.categories) {
+      calendar.addEventSource({
+        id: category.id,
+        events: visibleEvents().filter((event) => preferences.categoryId(event) === category.id).map((event) => ({
+          id: event.uid, title: event.title, start: event.start, end: event.end,
+          allDay: event.allDay, extendedProps: { source: event },
+          classNames: [`category-${category.id}`, `event-${event.status}`],
+          editable: capability.canEdit && !event.recurring,
+        })),
+      });
+    }
     renderAgenda();
-    if (!unlocked && isRestricted()) message("请输入访问密码。");
+    if (!unlocked && isRestricted()) message("只读 · 受限分类尚未解锁");
     else message(apiMode ? (capability.canEdit ? "可编辑" : "只读") : "只读");
   }
 
@@ -129,6 +158,7 @@
         : info.view.type === "multiMonthYear" ? `${start.year}年` : info.view.title;
       for (const button of $("#views").querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.view === info.view.type));
       $(".calendar-scroll").classList.toggle("week-scroll", info.view.type === "dayGridWeek");
+      $("#jump-date").value = dt(calendar.getDate().toISOString()).toISODate();
       renderAgenda();
       requestAnimationFrame(() => {
         for (const heading of document.querySelectorAll(".fc-multimonth-title")) {
@@ -145,6 +175,7 @@
       const compact = ["dayGridMonth", "quarter", "multiMonthYear"].includes(info.view.type);
       result.append(node("div", compact ? (source.allDay ? "全天" : dt(source.start).toFormat("HH:mm")) : timeText(source), "event-time"),
         node("div", zh, "event-title"), node("div", en, "english"));
+      if (source.status === "tentative") result.append(node("div", "待定", "event-label"));
       if (info.view.type === "dayGridDay") result.append(node("p", source.location, "agenda-meta"), badges(source));
       result.title = `${source.title}\n${timeText(source)}\n${source.location}`;
       return { domNodes: [result] };
@@ -165,6 +196,43 @@
       publish(`/events/${encodeURIComponent(source.uid)}`, "PATCH", patch).catch((error) => message(error.message, true));
     },
   });
+  for (const category of preferences.categories) {
+    const label = node("label", "", `category-option category-${category.id}`);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = category.id;
+    checkbox.checked = settings.categories.includes(category.id);
+    checkbox.addEventListener("change", () => {
+      settings.categories = [...$("#category-list").querySelectorAll("input:checked")].map((input) => input.value);
+      saveSettings();
+      refresh();
+    });
+    const count = node("span", "0", "category-count");
+    count.dataset.count = category.id;
+    count.setAttribute("aria-hidden", "true");
+    label.append(checkbox, node("span", category.label, "category-label"), count);
+    $("#category-list").append(label);
+  }
+  $("#theme").value = settings.theme;
+  $("#density").value = settings.density;
+  for (const key of ["theme", "density"]) $(`#${key}`).addEventListener("change", () => {
+    settings[key] = $(`#${key}`).value;
+    saveSettings();
+    applyAppearance();
+    calendar.updateSize();
+  });
+  $("#categories-all").addEventListener("click", () => {
+    settings.categories = preferences.categories.map((category) => category.id);
+    for (const input of $("#category-list").querySelectorAll("input")) input.checked = true;
+    saveSettings();
+    refresh();
+  });
+  $("#jump-date").addEventListener("change", () => {
+    if (!$("#jump-date").value) return;
+    let date = dt($("#jump-date").value);
+    if (calendar.view.type === "quarter") date = date.startOf("quarter");
+    calendar.gotoDate(date.toISODate());
+  });
   calendar.render();
 
   function changeView(view) {
@@ -181,7 +249,7 @@
   $("#today").addEventListener("click", () => {
     calendar.gotoDate(DateTime.now().setZone(zone).startOf(calendar.view.type === "quarter" ? "quarter" : "day").toISODate());
   });
-  for (const id of ["scope", "planning-status", "search"]) $(`#${id}`).addEventListener("input", refresh);
+  $("#search").addEventListener("input", refresh);
   $("#access-form").addEventListener("submit", (event) => {
     event.preventDefault();
     if ($("#access-password").value !== "betasdc") { message("密码不正确。", true); return; }
@@ -259,8 +327,9 @@
     const [locationZh, locationEn] = split(event?.location);
     for (const [name, value] of Object.entries({
       titleZh, titleEn, locationZh, locationEn, description: event?.description || "",
-      sourceUrl: event?.sourceUrl || "", scope: event?.scope || ($("#scope").value === "internal" ? "internal" : "public"),
-      status: event?.status || ($("#planning-status").value === "tentative" ? "tentative" : "planned"),
+      sourceUrl: event?.sourceUrl || "",
+      scope: event?.scope || (settings.categories.length === 1 ? settings.categories[0].split("-")[0] : "internal"),
+      status: event?.status || (settings.categories.length === 1 ? settings.categories[0].split("-")[1] : "planned"),
     })) field(name).value = value;
     field("allDay").checked = event?.allDay ?? true;
     updateDateInputs();
@@ -403,10 +472,12 @@
         capability = await request("/session");
         csrf = capability.csrf_token;
         apiMode = true;
+        if (capability.user) unlocked = true;
       }
       $("#login").hidden = !apiMode || Boolean(capability.user);
       $("#login").href = capability.loginUrl || "/login";
       $("#account-name").textContent = capability.user?.username || "";
+      $("#logout").hidden = !apiMode || !capability.user;
       $("#create").hidden = !capability.canEdit;
       $("#roles-open").hidden = capability.role !== "admin";
       if (capability.user) {
@@ -417,6 +488,15 @@
     } catch (error) { message(error.message || "日历加载失败，请刷新重试。", true); }
     lucide.createIcons();
   }
+  $("#logout").addEventListener("click", async () => {
+    if (saving || pendingJob) { message("请先确认当前发布结果。", true); return; }
+    try {
+      const response = await fetch("/api/logout", { method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: "{}" });
+      if (!response.ok) throw new Error("退出失败，请刷新重试。");
+      location.replace("/login");
+    } catch (error) { message(error.message, true); }
+  });
   // Multi-month headings open that month without replacing FullCalendar's rendering.
   $("#calendar").addEventListener("click", (event) => {
     const heading = event.target.closest(".fc-multimonth-title");

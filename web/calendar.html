@@ -6,21 +6,34 @@
   <title>BETA 日历</title>
   <link rel="icon" href="mark.png" type="image/png">
   <link rel="stylesheet" href="calendar.css">
+  <link rel="stylesheet" href="workspace.css">
   <script src="vendor/luxon.js" defer></script>
   <script src="vendor/fullcalendar.js" defer></script>
   <script src="vendor/fullcalendar-locales.js" defer></script>
   <script src="vendor/fullcalendar-luxon.js" defer></script>
   <script src="vendor/lucide.js" defer></script>
+  <script src="calendar-preferences.js" defer></script>
   <script src="calendar.js" defer></script>
 </head>
-<body>
+<body class="calendar-app">
   <header class="site-header">
     <a class="brand" href="calendar.html"><img src="mark.png" width="36" height="36" alt=""><span>BETA <span class="brand-name">日历</span></span></a>
     <nav aria-label="主要导航"><a href="index.html"><i data-lucide="radio"></i>订阅日历</a><a href="events.html">活动列表</a></nav>
-    <div class="account"><button id="roles-open" hidden><i data-lucide="users"></i>权限</button><a id="login" href="/login">登录</a><span id="account-name"></span></div>
+    <div class="account"><button id="roles-open" hidden><i data-lucide="users"></i>权限</button><a id="login" href="/login">登录</a><span id="account-name"></span><button id="logout" class="icon" title="退出登录" aria-label="退出登录" hidden><i data-lucide="log-out"></i></button></div>
   </header>
   <main>
-    <div class="page-heading"><div><p class="eyebrow">BETA STUDENT DEVELOPMENT COMMITTEE</p><h1>日历</h1></div><div><button id="resume" hidden><i data-lucide="refresh-cw"></i>检查发布状态</button><button id="create" class="primary" hidden><i data-lucide="plus"></i>新增活动</button></div></div>
+    <div class="page-heading"><div><p class="eyebrow">BETA STUDENT DEVELOPMENT COMMITTEE</p><h1>成员日历</h1></div><div><button id="resume" hidden><i data-lucide="refresh-cw"></i>检查发布状态</button><button id="create" class="primary" hidden><i data-lucide="plus"></i>新增活动</button></div></div>
+    <div class="workspace-layout">
+    <aside class="calendar-sidebar" aria-label="日历分类和外观">
+      <div class="sidebar-heading"><h2>我的日历</h2><button id="categories-all" class="icon" title="全选分类" aria-label="全选分类"><i data-lucide="list-checks"></i></button></div>
+      <div id="category-list" class="category-list"></div>
+      <div class="sidebar-settings">
+        <label for="theme">外观</label><select id="theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select>
+        <label for="density">显示密度</label><select id="density"><option value="comfortable">舒展</option><option value="compact">紧凑</option></select>
+        <label for="jump-date">跳转日期</label><input id="jump-date" type="date">
+      </div>
+      <div class="sidebar-footer"><i data-lucide="globe"></i>Asia/Shanghai</div>
+    </aside>
     <section class="calendar-workspace" aria-label="日历">
       <div class="toolbar">
         <div class="navigation"><button id="today">今天</button><button id="prev" class="icon" title="上一期" aria-label="上一期"><i data-lucide="chevron-left"></i></button><button id="next" class="icon" title="下一期" aria-label="下一期"><i data-lucide="chevron-right"></i></button><h2 id="period-title"></h2></div>
@@ -30,8 +43,7 @@
       </div>
       <div class="filters">
         <label class="search"><i data-lucide="search"></i><input id="search" type="search" placeholder="搜索活动、地点" aria-label="搜索活动、地点"></label>
-        <label>范围<select id="scope"><option value="public">公开活动</option><option value="internal">内部事件</option><option value="all">全部活动</option></select></label>
-        <label>状态<select id="planning-status"><option value="planned">计划事件</option><option value="tentative">待定事件</option><option value="all">全部状态</option></select></label>
+        <span id="filter-summary"></span>
         <span class="timezone">北京时间 · UTC+8</span>
       </div>
       <form id="access-form" class="access-bar" hidden>
@@ -42,8 +54,8 @@
       <div class="workspace-body"><div class="calendar-scroll"><div id="calendar"></div></div>
         <aside class="agenda" aria-label="本期活动"><div class="agenda-heading"><h3>本期活动</h3><span id="event-count">0</span></div><div id="agenda"></div></aside>
       </div>
-      <footer class="legend"><span><b class="dot public"></b>公开活动</span><span><b class="dot internal"></b>内部事件</span><span><b class="dot tentative"></b>待定</span></footer>
     </section>
+    </div>
   </main>
   <dialog id="editor" aria-labelledby="editor-title">
     <form id="event-form">

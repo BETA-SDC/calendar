@@ -90,6 +90,22 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/calendar/roles").status_code, 403)
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 202)
 
+    def test_beta_member_read_gate_and_public_pages_compatibility(self):
+        self.assertEqual(self.client.get("/api/calendar/events").status_code, 200)
+        self.app.config["CALENDAR_MEMBERS_ONLY"] = True
+        self.assertEqual(self.client.get("/calendar/").location, "/login")
+        self.assertEqual(self.client.get("/calendar/events-data.json").location, "/login")
+        self.assertEqual(self.client.get("/api/calendar/events").status_code, 401)
+        self.assertEqual(self.client.get("/api/calendar/session").status_code, 200)
+        for asset in ("calendar.css", "login.css", "login.js", "mark.png"):
+            with self.client.get("/calendar/" + asset) as response:
+                self.assertEqual(response.status_code, 200)
+        self.login(3)
+        self.assertEqual(self.client.get("/api/calendar/events").status_code, 200)
+        with self.client.get("/calendar/") as response:
+            self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.send("POST", "/events", self.payload).status_code, 403)
+
     def test_job_ownership_and_revoked_permissions(self):
         self.login(1)
         response = self.send("POST", "/events", self.payload)

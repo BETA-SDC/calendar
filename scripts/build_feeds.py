@@ -29,6 +29,7 @@ BASE_URL = "https://beta-sdc.github.io/calendar"
 WEB_ASSETS = (
     "index.html", "events.html", "styles.css", "access.js", "app.js", "events.js",
     "calendar.html", "calendar.css", "calendar.js", "login.html", "login.css", "login.js", "mark.png",
+    "workspace.css", "calendar-preferences.js",
 )
 
 

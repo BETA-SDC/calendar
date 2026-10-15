@@ -7,7 +7,7 @@ import uuid
 import re
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, abort, jsonify, request, send_from_directory, session
+from flask import Blueprint, abort, jsonify, redirect, request, send_from_directory, session
 from .publisher import validate_payload
 from .store import Store
 
@@ -68,6 +68,8 @@ def register_calendar(app, *, state, current_user, lookup_account, csrf_token):
 
     @api.get("/events")
     def read_events():
+        if app.config.get("CALENDAR_MEMBERS_ONLY") and not user():
+            abort(401, description="请先使用成员账号登录。")
         items = events()
         for key in ("start", "end"):
             if request.args.get(key):
@@ -182,6 +184,14 @@ def register_calendar(app, *, state, current_user, lookup_account, csrf_token):
                 or asset.startswith(".") or ".." in Path(asset).parts):
             abort(404)
         return send_from_directory(state / "current", asset)
+
+    @pages.before_request
+    def member_pages():
+        if not app.config.get("CALENDAR_MEMBERS_ONLY") or user():
+            return None
+        asset = request.view_args.get("asset", "") if request.view_args else ""
+        if asset not in {"calendar.css", "login.css", "login.js", "mark.png"}:
+            return redirect("/login")
 
     @pages.get("/calendar/calendar-config.json")
     def calendar_config():
