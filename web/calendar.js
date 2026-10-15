@@ -42,7 +42,7 @@
   let pendingJob = null;
   let unlocked = false;
   try { unlocked = sessionStorage.getItem("beta-calendar-unlocked") === "true"; } catch {}
-  const viewNames = { dayGridDay: "日", dayGridWeek: "周", dayGridMonth: "月", quarter: "季", multiMonthYear: "年" };
+  const viewNames = { timeGridDay: "日", timeGridWeek: "周", dayGridMonth: "月", quarter: "季", multiMonthYear: "年" };
 
   function node(tag, text, className) {
     const result = document.createElement(tag);
@@ -161,6 +161,9 @@
     themeSystem: "standard",
     initialView: "dayGridMonth", locale: "zh-cn", timeZone: zone, firstDay: 1,
     headerToolbar: false, height: "auto", fixedWeekCount: false,
+    nowIndicator: true, scrollTime: "08:00:00", slotMinTime: "06:00:00",
+    slotMaxTime: "24:00:00", slotDuration: "00:30:00", slotLabelInterval: "01:00",
+    expandRows: false, allDaySlot: true,
     dayMaxEvents: 3, eventOrder: "start,title", eventDisplay: "block",
     displayEventTime: false, navLinks: true,
     views: {
@@ -173,7 +176,7 @@
         ? `${start.year}年 · 第${Math.ceil(start.month / 3)}季度`
         : info.view.type === "multiMonthYear" ? `${start.year}年` : info.view.title;
       for (const button of $("#views").querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.view === info.view.type));
-      $(".calendar-scroll").classList.toggle("week-scroll", info.view.type === "dayGridWeek");
+      $(".calendar-scroll").classList.toggle("week-scroll", info.view.type === "timeGridWeek");
       $("#jump-date").value = dt(calendar.getDate().toISOString()).toISODate();
       renderAgenda();
     },
@@ -185,13 +188,13 @@
         node("div", zh, "event-title"), node("div", en, "english"));
       if (source.location) result.append(node("p", split(source.location)[0], "event-location"));
       if (source.status === "tentative") result.append(node("div", "待定", "event-label"));
-      if (info.view.type === "dayGridDay") result.append(badges(source));
+      if (info.view.type === "timeGridDay") result.append(badges(source));
       result.title = `${source.title}\n${timeText(source)}\n${source.location}`;
       return { domNodes: [result] };
     },
     eventClick(info) { info.jsEvent.preventDefault(); openEvent(info.event.extendedProps.source); },
-    dateClick(info) { if (capability.canEdit) openEvent(null, info.dateStr); else calendar.changeView("dayGridDay", info.dateStr); },
-    navLinkDayClick(date) { calendar.changeView("dayGridDay", date); },
+    dateClick(info) { if (capability.canEdit) openEvent(null, info.dateStr); else calendar.changeView("timeGridDay", info.dateStr); },
+    navLinkDayClick(date) { calendar.changeView("timeGridDay", date); },
     eventDrop(info) {
       const source = info.event.extendedProps.source;
       const days = info.delta.days;
