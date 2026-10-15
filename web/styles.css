@@ -599,10 +599,17 @@ input[type="range"] {
 }
 
 body[data-theme="dark"].subscription-page {
+  --beta-surface: #181d21;
+  --beta-panel: #20262b;
+  --beta-ink: #e3e9ed;
+  --beta-muted: #a9b6bf;
+  --beta-line: #39434b;
+  --beta-hover: #303b43;
   color-scheme: dark;
+  color: var(--beta-ink);
+  background: var(--beta-surface);
 }
 
-body[data-theme="dark"].subscription-page .subscription-page,
 body[data-theme="dark"].subscription-page .access-bar,
 body[data-theme="dark"].subscription-page .layout > section,
 body[data-theme="dark"].subscription-page .guide,
@@ -613,6 +620,31 @@ body[data-theme="dark"].subscription-page .page-link {
   color: var(--beta-ink);
   background: var(--beta-panel);
   border-color: var(--beta-line);
+}
+
+body[data-theme="dark"].subscription-page .subtitle,
+body[data-theme="dark"].subscription-page .access-fields label,
+body[data-theme="dark"].subscription-page .controls label,
+body[data-theme="dark"].subscription-page .timeline-head,
+body[data-theme="dark"].subscription-page .device {
+  color: var(--beta-muted);
+}
+
+body[data-theme="dark"].subscription-page input[type="range"] {
+  accent-color: #62c9ad;
+}
+
+body[data-theme="dark"].subscription-page .primary[aria-disabled="true"] {
+  opacity: 1;
+  color: var(--beta-muted);
+  background: var(--beta-hover);
+  border-color: var(--beta-line);
+}
+
+body[data-theme="dark"].subscription-page .secondary button,
+body[data-theme="dark"].subscription-page .secondary a,
+body[data-theme="dark"].subscription-page .device a {
+  color: #62c9ad;
 }
 
 body[data-theme="dark"].subscription-page .primary {
