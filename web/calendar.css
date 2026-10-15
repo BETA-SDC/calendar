@@ -7,7 +7,33 @@
 .fc .fc-timegrid-now-indicator-line { border-color: #d1242f; border-width: 2px; }
 .fc .fc-timegrid-now-indicator-arrow { border-top-color: #d1242f; border-bottom-color: #d1242f; }
 .fc .fc-timegrid-event { border-radius: 3px; padding: 4px 6px; }
-.fc .fc-timegrid-event .event-content .event-title { line-height: 1.4; }
+.fc .fc-timegrid-event .fc-event-main,
+.fc .fc-timegrid-event .event-content { min-height: 0; overflow: hidden; }
+.fc .fc-timegrid-event .event-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fc .fc-timegrid-event .event-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.fc .fc-timegrid-event .english,
+.fc .fc-timegrid-event .event-location {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-height: 1.3;
+  max-height: 1.3em;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.fc .fc-timegrid-event .event-label,
+.fc .fc-timegrid-event .badges { overflow: hidden; }
 .brand,.site-header nav a,.account button{white-space:nowrap}
 dialog[open]{position:fixed;inset:0 0 0 auto}
 body:has(dialog[open]){overflow:hidden}

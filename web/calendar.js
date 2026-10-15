@@ -161,7 +161,7 @@
     themeSystem: "standard",
     initialView: "dayGridMonth", locale: "zh-cn", timeZone: zone, firstDay: 1,
     headerToolbar: false, height: "auto", fixedWeekCount: false,
-    nowIndicator: true, scrollTime: "08:00:00", slotMinTime: "06:00:00",
+    nowIndicator: true, scrollTime: "08:00:00", slotMinTime: "00:00:00",
     slotMaxTime: "24:00:00", slotDuration: "00:30:00", slotLabelInterval: "01:00",
     expandRows: false, allDaySlot: true,
     dayMaxEvents: 3, eventOrder: "start,title", eventDisplay: "block",
