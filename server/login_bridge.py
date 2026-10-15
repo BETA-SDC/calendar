@@ -4,7 +4,7 @@ import os
 import re
 import stat
 
-REGISTRATION_HOST = "register.betasdc.duckdns.org"
+REGISTRATION_HOST = "account.betasdc.duckdns.org"
 CALENDAR_HOST = "calendar.betasdc.duckdns.org"
 CAMPUS_NETWORKS = ("10.16.112.0/20", "10.17.0.0/18", "10.17.128.0/18")
 CALENDAR_NETWORKS = ("0.0.0.0/0", "::/0")
@@ -30,9 +30,10 @@ def private_key(path):
 
 
 class HostRouter:
-    def __init__(self, account_wsgi, calendar_wsgi):
+    def __init__(self, account_wsgi, calendar_wsgi, sites_wsgi=None):
         self.account_wsgi = account_wsgi
         self.calendar_wsgi = calendar_wsgi
+        self.sites_wsgi = sites_wsgi or {}
 
     def __call__(self, environ, start_response):
         calendar_host = environ.get("HTTP_HOST", "").lower() == CALENDAR_HOST
@@ -48,5 +49,6 @@ class HostRouter:
                 and environ.get("HTTP_SEC_FETCH_DEST") == "document"):
             environ = environ.copy()
             environ.pop("HTTP_SEC_FETCH_SITE")
-        app = self.calendar_wsgi if calendar_host else self.account_wsgi
+        app = self.sites_wsgi.get(environ.get("HTTP_HOST", "").lower(),
+                                  self.calendar_wsgi if calendar_host else self.account_wsgi)
         return app(environ, start_response)

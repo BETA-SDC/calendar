@@ -79,6 +79,7 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertEqual(self.client.get("/calendar/../calendar.sqlite3").status_code, 404)
         with self.client.get("/calendar/") as response:
             self.assertIn("'unsafe-inline'", response.headers["Content-Security-Policy"])
+            self.assertIn('class="calendar-local-nav"', response.get_data(as_text=True))
 
     def test_auth_and_csrf_are_server_side(self):
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 403)

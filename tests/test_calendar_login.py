@@ -68,3 +68,17 @@ class CalendarLoginTest(unittest.TestCase):
         client.application.wsgi_app = HostRouter(account.wsgi_app, calendar.wsgi_app)
         self.assertEqual(client.get("/", base_url=f"https://{REGISTRATION_HOST}").data, b"account")
         self.assertEqual(client.get("/", base_url=f"https://{CALENDAR_HOST}").data, b"calendar")
+
+    def test_host_router_dispatches_explicit_shared_sites_without_wildcard(self):
+        def handler(text):
+            def app(environ, start_response):
+                start_response("200 OK", [])
+                return [text.encode()]
+            return app
+        router = HostRouter(handler("account"), handler("calendar"), {
+            "nav.betasdc.duckdns.org": handler("navigation"),
+            "profile.betasdc.duckdns.org": handler("profile"),
+        })
+        for host, expected in (("nav", b"navigation"), ("profile", b"profile"), ("unknown", b"account")):
+            environ = {"HTTP_HOST": host + ".betasdc.duckdns.org"}
+            self.assertEqual(b"".join(router(environ, lambda *_: None)), expected)

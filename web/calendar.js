@@ -464,10 +464,12 @@
         }
       }
       $("h1").textContent = guestMode ? "公开日历" : "成员日历";
-      $("#account-name").textContent = capability.user?.username || (guestMode ? "游客" : "");
-      $("#login").hidden = !apiMode || Boolean(capability.user);
-      $("#login").href = capability.loginUrl || "/login";
-      $("#logout").hidden = !apiMode || !capability.user;
+      if ($("#account-name")) $("#account-name").textContent = capability.user?.username || (guestMode ? "游客" : "");
+      if ($("#login")) {
+        $("#login").hidden = !apiMode || Boolean(capability.user);
+        $("#login").href = capability.loginUrl || "/login";
+      }
+      if ($("#logout")) $("#logout").hidden = !apiMode || !capability.user;
       $("#create").hidden = !capability.canEdit;
       if (capability.user) {
         try { pendingJob = localStorage.getItem(`beta-calendar-job-${capability.user.id}`); } catch {}
@@ -477,7 +479,7 @@
     } catch (error) { message(error.message || "日历加载失败，请刷新重试。", true); }
     lucide.createIcons();
   }
-  $("#logout").addEventListener("click", async () => {
+  $("#logout")?.addEventListener("click", async () => {
     if ((saving || pendingJob) && !window.confirm("有更改尚待确认发布结果。退出不会撤回已提交的更改，再次登录可查看结果。仍要退出？")) return;
     if (editor.open && !$("#fields").hidden && !saving && !pendingJob
         && !window.confirm("退出将放弃尚未保存的表单内容。仍要退出？")) return;
@@ -497,6 +499,9 @@
   });
   window.addEventListener("pageshow", (event) => {
     if (event.persisted && apiMode) location.reload();
+  });
+  document.addEventListener("beta-session", event => {
+    if (apiMode && capability.user && !event.detail.user) location.reload();
   });
   initialize();
 })();

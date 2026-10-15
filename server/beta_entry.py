@@ -9,6 +9,7 @@ from .login_bridge import CALENDAR_HOST, CALENDAR_NETWORKS, CAMPUS_NETWORKS, Hos
 def create_app():
     from server.registration import create_app as create_registration_app
     from server.registration.auth import current_account, csrf_token
+    from server.registration.sites import NAV_HOST, PROFILE_HOST
 
     state = Path(os.environ.get("CALENDAR_STATE", "/var/lib/betasdc-calendar"))
     state.mkdir(parents=True, exist_ok=True)
@@ -30,18 +31,24 @@ def create_app():
     calendar_store = register_calendar(calendar_app, state=state, current_user=current_user,
                                       csrf_token=csrf_token)
     app.extensions["calendar_store"] = calendar_store
+    site_apps = {host: create_registration_app(config={
+        "REGISTRATION_DOMAIN": host, "REGISTRATION_NETWORKS": CAMPUS_NETWORKS,
+        "SECRET_KEY": private_key(state / (host.split(".")[0] + ".session-key")),
+        "GITHUB_CLIENT_ID": "",
+    }) for host in (NAV_HOST, PROFILE_HOST)}
     @calendar_app.before_request
     def calendar_entry():
-        from flask import abort, redirect, request, send_from_directory
+        from flask import abort, redirect, request
         if request.path == "/":
             return redirect("/calendar/")
         if request.path in ("/register", "/verify"):
             return redirect(f"https://{REGISTRATION_HOST}{request.path}")
-        if request.path in ("/login", "/account"):
-            return send_from_directory(Path(__file__).resolve().parents[1] / "web", "login.html")
+        if request.path in ("/login", "/account", "/calendar/login.html"):
+            return redirect("/sso/start?login=1&next=%2Fcalendar%2F", 303)
         if request.path in ("/api/register", "/api/signup/code",
                             "/api/verification/resend", "/api/verification/confirm",
                             "/api/github/link", "/api/github/unlink", "/api/github/callback"):
             abort(404)
-    app.wsgi_app = HostRouter(app.wsgi_app, calendar_app.wsgi_app)
+    app.wsgi_app = HostRouter(app.wsgi_app, calendar_app.wsgi_app,
+                              {host: site.wsgi_app for host, site in site_apps.items()})
     return app

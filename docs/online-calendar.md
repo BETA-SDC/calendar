@@ -193,3 +193,28 @@ sudo sh deploy/rollback.sh /var/backups/betasdc-calendar/TIMESTAMP
 回滚恢复旧应用与配置，不删除角色审计库，也不撤销已推送的日历事件；
 事件内容回退使用正常 Git 提交。无需修改已有 Caddy 配置或放宽登录服务
 的网络隔离。
+
+## 统一站点导航与登录
+
+日历域名仍为 `calendar.betasdc.duckdns.org`，日历内容区顶部提供“日历、订阅日历、活动列表”。
+账户、导航、个人主页和在线日历通过账户服务提供的 `/beta-shell.js`、
+`/beta-shell.css` 使用同一套顶栏。左上角菜单只有导航入口；
+右上角显示当前账户头像、昵称，头像菜单只有 Profile 与 Settings。
+GitHub Pages 静态发布不注入账户顶栏，在线部署才提供统一账户能力。
+
+导航站为 `nav.betasdc.duckdns.org`，个人主页为
+`profile.betasdc.duckdns.org/<代号或审核后的地址>`，二者沿用账户中心的校园网络限制。
+个人主页只公开昵称或代号、头像、公开简介及 GitHub 链接；不公开邮箱或私密资料。
+
+日历 `/login` 和旧登录页跳转至 `/sso/start`，由
+`account.betasdc.duckdns.org` 登录后返回日历。凭据仅存摘要，绑定目标站、
+目标浏览器随机值及账户中心会话，60 秒单次使用；各站保持独立签名密钥和
+host-only `__Host-` Cookie，不放宽账户中心 CORS，也不共享父域 Cookie。
+派生日历会话每次请求都检查账户中心父会话，退出账户中心后失效。
+日历仍允许游客查看公开计划活动；非校园网络不能连接账户中心时不自动跳转。
+原有日历 editor/admin 授权不改变。账户敏感操作仅允许账户域名调用。
+
+在线日历的 `calendar.html`、`calendar.js`、`workspace.css` 直接读取安装目录的
+`web/` 源文件，其他发布资源仍从不可变事件 release 读取，因此升级 UI
+不会改写活动快照、feeds 或已发布事件。部署时需同时更新账户服务共享模板和
+日历的 host router；原端口、systemd 单元与发布 worker 保持不变。

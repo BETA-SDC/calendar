@@ -165,6 +165,9 @@ def register_calendar(app, *, state, current_user, csrf_token):
         if (asset in {"server-events.json", "revision.json"}
                 or asset.startswith(".") or ".." in Path(asset).parts):
             abort(404)
+        # UI-only upgrades must not mutate an immutable published event release.
+        if asset in {"calendar.html", "calendar.js", "workspace.css"}:
+            return send_from_directory(Path(__file__).resolve().parents[1] / "web", asset)
         return send_from_directory(state / "current", asset)
 
     @pages.before_request
@@ -197,7 +200,7 @@ def register_calendar(app, *, state, current_user, csrf_token):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
+            "img-src 'self' data: https://avatars.githubusercontent.com; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
             "base-uri 'none'; form-action 'self'"
         )
         return response
