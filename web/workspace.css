@@ -25,3 +25,18 @@
 .calendar-local-nav { display: flex; align-items: center; gap: 24px; border-bottom: 1px solid var(--border, #d8dee4); padding: 0 0 16px; margin-bottom: 24px; flex-wrap: wrap; font-size: 13px; }
 .calendar-local-nav a { color: inherit; text-decoration: none; padding: 8px 0; }
 .calendar-local-nav a[aria-current] { border-bottom: 2px solid #0969da; font-weight: 600; }
+.calendar-app .agenda-item {
+  background: var(--event-fill);
+  border-left: 3px solid var(--category);
+  border-bottom: 1px solid var(--line);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.calendar-app .agenda-item:hover,
+.calendar-app .agenda-item:focus-visible {
+  background: var(--event-fill);
+  outline: 2px solid var(--category);
+  outline-offset: -2px;
+}
+.calendar-app .agenda-item .agenda-title { color: var(--event-ink); }
+.calendar-app .fc-timegrid .fc-scroller { overscroll-behavior-y: contain; }

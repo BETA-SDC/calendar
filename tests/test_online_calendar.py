@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import shutil
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +11,7 @@ from flask import Flask, session
 from server.api import register_calendar
 from server.publisher import PublicationError, Publisher, RetryPublication, ROOT, run, snapshot
 from server.store import Store
+from server.worker import owner_access
 
 
 class OnlineCalendarTest(unittest.TestCase):
@@ -39,6 +41,22 @@ class OnlineCalendarTest(unittest.TestCase):
         self.accounts = {1: self.actor, 2: self.admin, 3: {"id": 3, "username": "viewer"}}
         self.app = Flask(__name__)
         self.app.secret_key = "test-only"
+        self.registration = Store(self.root / "accounts.sqlite3")
+        with self.registration.connection() as db:
+            db.executescript("""
+                CREATE TABLE github_accounts(user_id INTEGER PRIMARY KEY);
+                CREATE TABLE github_admin_grants(user_id INTEGER PRIMARY KEY, valid_until INTEGER);
+                CREATE TABLE account_groups(id INTEGER PRIMARY KEY, external_key TEXT, archived INTEGER);
+                CREATE TABLE group_members(user_id INTEGER, group_id INTEGER, source TEXT, valid_until INTEGER);
+                INSERT INTO github_accounts VALUES(1),(2),(4);
+                INSERT INTO account_groups VALUES(1,'github:org:BETA-SDC',0);
+            """)
+            until = int(time.time()) + 86400
+            db.executemany("INSERT INTO github_admin_grants VALUES(?,?)", [(1, until), (2, until)])
+            db.execute("INSERT INTO group_members VALUES(4,1,'github',?)", (until,))
+        self.accounts[4] = {"id": 4, "username": "member"}
+        self.app.extensions["registration_store"] = self.registration
+        self.publisher.can_manage = lambda user_id: owner_access(self.registration.path, user_id)
         register_calendar(self.app, state=self.state,
                           current_user=lambda: self.accounts.get(session.get("user_id")),
                           csrf_token=lambda: session.setdefault("csrf_token", "csrf-test"))
@@ -100,7 +118,8 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertEqual(response.headers["Cache-Control"], "no-store")
         with self.client.get("/calendar/") as page:
             self.assertEqual(page.status_code, 200)
-        self.assertEqual(self.client.get("/calendar/events-data.json").status_code, 404)
+        self.assertTrue(all(event["scope"] == "public" and event["status"] == "planned"
+                            for event in self.client.get("/calendar/events-data.json").json["events"]))
         self.assertEqual(self.client.get("/api/calendar/session").status_code, 200)
         for asset in ("calendar.css", "workspace.css", "calendar.js", "calendar-preferences.js",
                       "login.css", "login.js", "calendar-account.js", "mark.png"):
@@ -112,9 +131,8 @@ class OnlineCalendarTest(unittest.TestCase):
             {event["uid"] for event in expected},
         )
         self.assertEqual(
-            self.client.get("/calendar/events-data.json").json["events"],
-            expected,
-        )
+            {event["uid"] for event in self.client.get("/calendar/events-data.json").json["events"]},
+            {event["uid"] for event in expected})
         subscription = self.client.get("/calendar/calendar-data.json").json
         self.assertTrue(subscription["feeds"])
         self.assertTrue(all(key.startswith("public@planned") for key in subscription["feeds"]))
@@ -123,7 +141,7 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertEqual(self.send("POST", "/events", self.payload).status_code, 403)
 
     def test_guest_cannot_bypass_filter_through_static_files_or_write(self):
-        for asset in ("events-data.json", "server-events.json", "revision.json", "all.ics",
+        for asset in ("server-events.json", "revision.json", "all.ics",
                       "public.ics", "internal.ics", "tentative.ics"):
             self.assertEqual(self.client.get("/calendar/" + asset).status_code, 404, asset)
         for event in self.data():
@@ -150,8 +168,36 @@ class OnlineCalendarTest(unittest.TestCase):
         self.login(3)
         self.assertEqual(self.client.get("/api/calendar/jobs/" + job_id).status_code, 404)
         self.store.grant(self.admin, self.actor, "viewer")
+        with self.registration.connection() as db:
+            db.execute("DELETE FROM github_admin_grants WHERE user_id=1")
         with self.assertRaisesRegex(PublicationError, "撤销"):
             self.publisher.process(self.store.job(job_id))
+
+    def test_member_reads_all_but_only_owner_can_write(self):
+        self.login(4)
+        capabilities = self.client.get("/api/calendar/session").json
+        self.assertTrue(capabilities["canViewAll"])
+        self.assertFalse(capabilities["canEdit"])
+        self.assertEqual(len(self.client.get("/api/calendar/events").json["events"]), len(self.data()))
+        self.assertEqual(self.send("POST", "/events", self.payload | {"status": "tentative"}).status_code, 403)
+        self.login(1)
+        self.assertTrue(self.client.get("/api/calendar/session").json["isOwner"])
+        self.assertEqual(self.send("POST", "/events", self.payload | {"status": "tentative"}).status_code, 202)
+
+    def test_expired_unlinked_and_local_roles_cannot_grant_access(self):
+        self.login(1)
+        with self.registration.connection() as db:
+            db.execute("UPDATE github_admin_grants SET valid_until=0 WHERE user_id=1")
+        self.assertFalse(self.client.get("/api/calendar/session").json["canEdit"])
+        self.assertFalse(owner_access(self.registration.path, 1))
+        self.login(4)
+        with self.registration.connection() as db:
+            db.execute("DELETE FROM github_accounts WHERE user_id=4")
+        self.assertFalse(self.client.get("/api/calendar/session").json["canViewAll"])
+        self.store.grant(self.admin, self.accounts[4], "admin")
+        self.assertFalse(self.client.get("/api/calendar/session").json["canEdit"])
+        self.app.extensions.pop("registration_store")
+        self.assertFalse(self.client.get("/api/calendar/session").json["canEdit"])
 
     def test_api_conflict_and_schema_validation(self):
         self.login(1)

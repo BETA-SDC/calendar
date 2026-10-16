@@ -1,5 +1,6 @@
 """Run with python -m calendar_service.worker (see deployment install script)."""
 import argparse
+from contextlib import closing
 import logging
 import os
 from pathlib import Path
@@ -12,7 +13,7 @@ from .store import Store
 
 
 def owner_access(database, user_id):
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + "?mode=ro", uri=True)) as connection:
         return connection.execute(
             "SELECT 1 FROM github_admin_grants a JOIN github_accounts g ON g.user_id=a.user_id "
             "WHERE a.user_id=? AND a.valid_until>?",

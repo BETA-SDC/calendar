@@ -28,11 +28,7 @@ def register_calendar(app, *, state, current_user, csrf_token):
             return {"role": "viewer", "member": False, "owner": False}
         registration_store = current_app.extensions.get("registration_store")
         if registration_store is None:
-            # The standalone calendar test app has no account database. Its
-            # local calendar roles remain a test-only compatibility fallback.
-            actual = store.role(account["id"])
-            return {"role": actual, "member": actual in ("editor", "admin"),
-                    "owner": actual in ("editor", "admin")}
+            return {"role": "viewer", "member": False, "owner": False}
         now = int(time.time())
         with registration_store.connection() as connection:
             owner = connection.execute(
@@ -42,6 +38,7 @@ def register_calendar(app, *, state, current_user, csrf_token):
             ).fetchone() is not None
             member = connection.execute(
                 "SELECT 1 FROM group_members m JOIN account_groups g ON g.id=m.group_id "
+                "JOIN github_accounts a ON a.user_id=m.user_id "
                 "WHERE m.user_id=? AND m.source='github' AND g.external_key=? AND g.archived=0 "
                 "AND (m.valid_until IS NULL OR m.valid_until>?)",
                 (account["id"], "github:org:BETA-SDC", now),

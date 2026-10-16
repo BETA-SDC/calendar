@@ -157,6 +157,12 @@
     else message(apiMode ? (capability.canEdit ? "可编辑" : "只读") : "只读");
   }
 
+  function updateViewHeight(view) {
+    const timeGrid = view.type === "timeGridDay" || view.type === "timeGridWeek";
+    const height = timeGrid ? Math.max(360, Math.min(800, Math.round(window.innerHeight * 0.65))) : "auto";
+    if (view.calendar.getOption("height") !== height) view.calendar.setOption("height", height);
+  }
+
   const calendar = new FullCalendar.Calendar($("#calendar"), {
     themeSystem: "standard",
     initialView: "dayGridMonth", locale: "zh-cn", timeZone: zone, firstDay: 1,
@@ -171,6 +177,7 @@
       multiMonthYear: { multiMonthMaxColumns: 3 },
     },
     datesSet(info) {
+      updateViewHeight(info.view);
       const start = dt(info.view.currentStart.toISOString());
       $("#period-title").textContent = info.view.type === "quarter"
         ? `${start.year}年 · 第${Math.ceil(start.month / 3)}季度`
@@ -180,6 +187,7 @@
       $("#jump-date").value = dt(calendar.getDate().toISOString()).toISODate();
       renderAgenda();
     },
+    windowResize(info) { updateViewHeight(info.view); },
     eventContent(info) {
       const source = info.event.extendedProps.source;
       const [zh, en] = split(source.title);
