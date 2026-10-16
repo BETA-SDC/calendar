@@ -56,7 +56,8 @@ beta 集成入口是 `calendar_service.beta_entry:create_app()`。
 复用原服务。日历域名使用独立会话密钥，避免复制账号站点密钥。
 
 正式入口使用 `https://calendar.betasdc.duckdns.org/`，根路径跳转到日历。
-日历域名不限制来源网段：Nginx 显式 `allow all`，应用网络配置接受全部
+所有 BETA 站点（账户、日历、个人主页、旧导航）和跨站 SSO 均不限制来源网段：
+Nginx 显式 `allow all`，共享应用和 SSO 网络配置接受全部
 IPv4／IPv6 地址。仍要求 HTTPS 和正确域名；写入要求成员登录、编辑权限和 CSRF；
 连接限制、请求大小限制、登录尝试限制与来源校验保留。
 注册站点的校园网策略不变，部署脚本不会修改其现有 Nginx 白名单。

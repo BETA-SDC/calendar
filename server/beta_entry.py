@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 from .api import register_calendar
-from .login_bridge import CALENDAR_HOST, CALENDAR_NETWORKS, CAMPUS_NETWORKS, HostRouter, REGISTRATION_HOST, private_key
+from .login_bridge import CALENDAR_HOST, CALENDAR_NETWORKS, HostRouter, REGISTRATION_HOST, private_key
 
 
 def create_app():
@@ -13,10 +13,13 @@ def create_app():
 
     state = Path(os.environ.get("CALENDAR_STATE", "/var/lib/betasdc-calendar"))
     state.mkdir(parents=True, exist_ok=True)
-    app = create_registration_app(config={"REGISTRATION_NETWORKS": CAMPUS_NETWORKS})
+    app = create_registration_app(config={
+        "REGISTRATION_NETWORKS": CALENDAR_NETWORKS, "SSO_NETWORKS": CALENDAR_NETWORKS,
+    })
     calendar_app = create_registration_app(config={
         "REGISTRATION_DOMAIN": CALENDAR_HOST,
         "REGISTRATION_NETWORKS": CALENDAR_NETWORKS,
+        "SSO_NETWORKS": CALENDAR_NETWORKS,
         "SECRET_KEY": private_key(state / "calendar.session-key"),
         "GITHUB_CLIENT_ID": "",
     })
@@ -32,7 +35,8 @@ def create_app():
                                       csrf_token=csrf_token)
     app.extensions["calendar_store"] = calendar_store
     site_apps = {host: create_registration_app(config={
-        "REGISTRATION_DOMAIN": host, "REGISTRATION_NETWORKS": CAMPUS_NETWORKS,
+        "REGISTRATION_DOMAIN": host, "REGISTRATION_NETWORKS": CALENDAR_NETWORKS,
+        "SSO_NETWORKS": CALENDAR_NETWORKS,
         "SECRET_KEY": private_key(state / (host.split(".")[0] + ".session-key")),
         "GITHUB_CLIENT_ID": "",
     }) for host in (NAV_HOST, PROFILE_HOST)}

@@ -5,7 +5,7 @@ import unittest
 
 from flask import Flask
 
-from server.login_bridge import CALENDAR_HOST, CALENDAR_NETWORKS, CAMPUS_NETWORKS, HostRouter, REGISTRATION_HOST, private_key
+from server.login_bridge import CALENDAR_HOST, CALENDAR_NETWORKS, HostRouter, REGISTRATION_HOST, private_key
 
 
 class CalendarLoginTest(unittest.TestCase):
@@ -15,14 +15,19 @@ class CalendarLoginTest(unittest.TestCase):
                         "127.0.0.1", "2001:db8::1234", "::1"):
             self.assertTrue(any(ipaddress.ip_address(address) in network for network in networks), address)
 
-    def test_confirmed_campus_subnet_without_broad_private_network_access(self):
-        networks = [ipaddress.ip_network(value) for value in CAMPUS_NETWORKS]
-        def allowed(value):
-            return any(ipaddress.ip_address(value) in network for network in networks)
-        for address in ("10.17.7.116", "10.17.63.254", "10.16.125.52", "10.17.128.1"):
-            self.assertTrue(allowed(address), address)
-        for address in ("10.17.64.1", "10.26.79.1", "192.168.1.1", "203.0.113.1"):
-            self.assertFalse(allowed(address), address)
+    def test_shared_hosts_use_the_same_unrestricted_network_policy(self):
+        import ast
+        source = ast.parse((Path(__file__).resolve().parents[1] / "server/beta_entry.py").read_text())
+        keys = []
+        for node in ast.walk(source):
+            if isinstance(node, ast.Dict):
+                for key, value in zip(node.keys, node.values):
+                    if isinstance(key, ast.Constant) and key.value in ("REGISTRATION_NETWORKS", "SSO_NETWORKS"):
+                        self.assertIsInstance(value, ast.Name)
+                        self.assertEqual(value.id, "CALENDAR_NETWORKS")
+                        keys.append(key.value)
+        self.assertEqual(keys.count("REGISTRATION_NETWORKS"), 3)
+        self.assertEqual(keys.count("SSO_NETWORKS"), 3)
 
     def test_external_navigation_exception_is_read_only_and_calendar_only(self):
         def echo(environ, start_response):
