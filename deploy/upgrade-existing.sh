@@ -34,7 +34,7 @@ find "$ROOT/web" -type f -exec chmod 644 {} +
 cd "$ROOT"
 runuser -u betasdc -g www-data -- env CALENDAR_STATE="$STATE" PYTHONPATH=/opt/betasdc \
     "$ROOT/.venv/bin/python" -B -c \
-    'from calendar_service.beta_entry import create_app; create_app(); print("Application initialized")'
+    'import sys; sys.path.insert(0, "/opt/betasdc"); from calendar_service.beta_entry import create_app; create_app(); print("Application initialized")'
 systemctl start betasdc-calendar.service
 ready=false
 for attempt in $(seq 1 60); do
