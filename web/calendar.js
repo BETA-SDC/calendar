@@ -185,9 +185,12 @@
       const [zh, en] = split(source.title);
       const result = node("div", "", "event-content");
       result.append(node("div", timeText(source), "event-time"),
-        node("div", zh, "event-title"), node("div", en, "english"));
-      if (source.location) result.append(node("p", split(source.location)[0], "event-location"));
-      if (source.status === "tentative") result.append(node("div", "待定", "event-label"));
+        node("div", zh, "event-title"));
+      if (info.view.type !== "timeGridWeek") {
+        result.append(node("div", en, "english"));
+        if (source.location) result.append(node("p", split(source.location)[0], "event-location"));
+        if (source.status === "tentative") result.append(node("div", "待定", "event-label"));
+      }
       if (info.view.type === "timeGridDay") result.append(badges(source));
       result.title = `${source.title}\n${timeText(source)}\n${source.location}`;
       return { domNodes: [result] };
