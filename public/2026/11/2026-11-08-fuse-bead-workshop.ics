@@ -1,0 +1,47 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Apple Inc.//macOS 15.5//EN
+CALSCALE:GREGORIAN
+X-WR-CALNAME:BETA 公开活动 / Public Events
+X-APPLE-CALENDAR-COLOR:#4A90E2
+BEGIN:VTIMEZONE
+TZID:Asia/Shanghai
+BEGIN:STANDARD
+DTSTART:19890917T020000
+RRULE:FREQ=YEARLY;UNTIL=19910914T170000Z;BYDAY=3SU;BYMONTH=9
+TZNAME:GMT+8
+TZOFFSETFROM:+0900
+TZOFFSETTO:+0800
+END:STANDARD
+BEGIN:DAYLIGHT
+DTSTART:19910414T020000
+RDATE:19910414T020000
+TZNAME:GMT+8
+TZOFFSETFROM:+0800
+TZOFFSETTO:+0900
+END:DAYLIGHT
+END:VTIMEZONE
+BEGIN:VEVENT
+SUMMARY:拼豆活动（时间待定） / Fuse Bead Workshop (Time TBD)
+DTSTART;VALUE=DATE:20261108
+DTEND;VALUE=DATE:20261109
+DTSTAMP:20261021T172340Z
+UID:beta-sdc-event-proposal-40@beta-sdc.github.io
+SEQUENCE:0
+CREATED:20261021T172340Z
+DESCRIPTION:活动日期：2026-11-08，具体起止时间和地点待定
+ 。全天条目仅为日期占位，并非全天活动。 / Date: 2026-11-
+ 08\; exact start/end times and venue are to be confirmed. This all-day ent
+ ry is a date placeholder\, not an all-day activity. 活动形式：手工
+ 拼豆，在期中考试后帮助同学们放松。 / Format: a hands-on f
+ use bead workshop to relax after midterm exams. 负责人：王绎如 @Elo
+ iseWarm；相关成员：梁皓然 @toby600。材料：需要购买拼豆
+ 用豆。报名、活动群及图案任务：event-proposal#82；现场执
+ 行：event-proposal#83，成员待定。
+LAST-MODIFIED:20261021T172340Z
+LOCATION:地点待定 / Venue TBD
+STATUS:TENTATIVE
+TRANSP:OPAQUE
+URL:https://github.com/BETA-SDC/event-proposal/issues/40
+END:VEVENT
+END:VCALENDAR
