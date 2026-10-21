@@ -8,8 +8,9 @@ REVISION=${2:?Provide the expected Git revision}
 ROOT=/opt/betasdc-calendar
 STATE=/var/lib/betasdc-calendar
 [ -f "$SOURCE/server/api.py" ] && [ -f "$SOURCE/web/calendar.js" ] || exit 1
+[ -f "$SOURCE/scripts/build_feeds.py" ] && [ -f "$SOURCE/scripts/calendar_cli.py" ] || exit 1
 BACKUP=$(mktemp -d /var/backups/betasdc/calendar-upgrade-XXXXXX)
-tar -C "$ROOT" -cpf "$BACKUP/code.tar" server web
+tar -C "$ROOT" -cpf "$BACKUP/code.tar" server scripts web
 readlink "$STATE/current" > "$BACKUP/current"
 rollback() {
     result=$?
@@ -24,8 +25,10 @@ rollback() {
 }
 trap rollback EXIT
 systemctl stop betasdc-calendar.service
-for file in "$SOURCE"/server/*.py; do
-    install -o root -g root -m 644 "$file" "$ROOT/server/$(basename "$file")"
+for directory in server scripts; do
+    for file in "$SOURCE/$directory"/*.py; do
+        install -o root -g root -m 644 "$file" "$ROOT/$directory/$(basename "$file")"
+    done
 done
 cp -R "$SOURCE/web/." "$ROOT/web/"
 chown -R root:root "$ROOT/web"
