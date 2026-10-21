@@ -22,8 +22,10 @@ from build_feeds import (
     STATUS_LABELS,
     event_status,
     event_uid,
+    is_bilingual,
     load_source_events,
     serialize_event,
+    validate_source_text,
 )
 
 
@@ -55,8 +57,8 @@ def parse_date_argument(value: str) -> str:
 
 
 def require_bilingual(value: str, field: str) -> None:
-    if " / " not in value:
-        fail(f"{field} must use the bilingual format 中文 / English")
+    if not is_bilingual(value):
+        fail(f"{field} must use 中文 / English (Chinese characters before / and English letters after /)")
 
 
 def parse_start(value: str) -> date | datetime:
@@ -351,9 +353,9 @@ def command_inspect(args: argparse.Namespace) -> None:
             issues.append("missing UID")
         if not start:
             issues.append("missing DTSTART")
-        if " / " not in title:
+        if not is_bilingual(title):
             issues.append("SUMMARY needs bilingual --title")
-        if location and " / " not in location:
+        if location and not is_bilingual(location):
             issues.append("LOCATION needs bilingual --location")
         if start and end:
             if isinstance(start, datetime) != isinstance(end, datetime):
@@ -731,6 +733,7 @@ def command_delete(args: argparse.Namespace) -> None:
 
 def command_validate(args: argparse.Namespace) -> None:
     by_scope = load_source_events(args.root.resolve())
+    validate_source_text(by_scope)
     count = sum(len(entries) for entries in by_scope.values())
     result = {"valid": True, "events": count, "scopes": {scope: len(by_scope[scope]) for scope in ("public", "internal")}}
     output(result, args.json)

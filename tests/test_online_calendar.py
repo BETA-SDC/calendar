@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from flask import Flask, session
+from icalendar import Calendar
 
 from server.api import register_calendar
 from server.publisher import PublicationError, Publisher, RetryPublication, ROOT, run, snapshot
@@ -90,7 +91,7 @@ class OnlineCalendarTest(unittest.TestCase):
         response = self.client.get("/api/calendar/session").json
         self.assertFalse(response["canEdit"])
         self.assertIsNone(response["user"])
-        for asset in ("", "calendar.js", "vendor/fullcalendar.js", "mark.png"):
+        for asset in ("", "calendar.js", "calendar-validation.js", "vendor/fullcalendar.js", "mark.png"):
             with self.client.get("/calendar/" + asset) as response:
                 self.assertEqual(response.status_code, 200)
         self.assertEqual(self.client.get("/calendar/server-events.json").status_code, 404)
@@ -208,6 +209,46 @@ class OnlineCalendarTest(unittest.TestCase):
                         self.payload | {"alarmMinutes": True}, self.payload | {"sourceUrl": "javascript:x"},
                         self.payload | {"alarmMode": ["set"]}):
             self.assertEqual(self.send("POST", "/events", payload).status_code, 422, payload)
+
+    def test_bilingual_validation_rejects_before_queueing_add_or_update(self):
+        self.login(1)
+        event = self.data()[0]
+        for key in ("title", "location"):
+            for value in ("H4-103 / H4-103", "English / English", "中文 / 中文",
+                          "中文 / ", " / English", "English / 中文"):
+                for method, path, payload in (
+                    ("POST", "/events", self.payload | {key: value}),
+                    ("PATCH", "/events/" + event["uid"],
+                     {"version": event["version"], key: value}),
+                ):
+                    with self.subTest(key=key, value=value, method=method):
+                        response = self.send(method, path, payload)
+                        self.assertEqual(response.status_code, 422)
+                        self.assertIn("左侧须含中文", response.json["error"])
+        self.assertIsNone(self.store.next_job())
+        for location in ("", "H4-103 室 / Room H4-103"):
+            response = self.send("POST", "/events", self.payload | {"location": location})
+            self.assertEqual(response.status_code, 202)
+
+    def test_invalid_source_text_never_pushes_or_activates(self):
+        before = self.git("rev-parse", "HEAD", cwd=self.remote)
+        active = (self.state / "current").readlink()
+        original = self.publisher.apply
+
+        def apply_invalid(root, job):
+            original(root, job)
+            event = next(item for item in snapshot(root) if item["uid"] == job["uid"])
+            path = root / event["path"]
+            calendar = Calendar.from_ical(path.read_bytes())
+            calendar.walk("VEVENT")[0]["LOCATION"] = "H4-103 / H4-103"
+            path.write_bytes(calendar.to_ical())
+
+        job_id = self.store.enqueue(self.actor, "add", "test@beta", self.payload)
+        with patch.object(self.publisher, "apply", side_effect=apply_invalid):
+            with self.assertRaisesRegex(PublicationError, "LOCATION"):
+                self.publisher.process(self.store.job(job_id))
+        self.assertEqual(self.git("rev-parse", "HEAD", cwd=self.remote), before)
+        self.assertEqual((self.state / "current").readlink(), active)
 
     def test_role_management_is_not_exposed_by_calendar(self):
         self.login(2)

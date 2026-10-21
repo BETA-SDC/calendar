@@ -14,7 +14,7 @@ from icalendar import Calendar, Event
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
 
-from build_feeds import build_site, load_source_events  # noqa: E402
+from build_feeds import build_site, is_bilingual, load_source_events, validate_source_text  # noqa: E402
 
 
 class BuildFeedsTest(unittest.TestCase):
@@ -40,7 +40,7 @@ class BuildFeedsTest(unittest.TestCase):
         calendar.add("VERSION", "2.0")
         event = Event()
         event.add("UID", uid)
-        event.add("SUMMARY", "Test event")
+        event.add("SUMMARY", "测试活动 / Test event")
         event.add("DTSTART", start)
         event.add("DTEND", start)
         calendar.add_component(event)
@@ -55,6 +55,40 @@ class BuildFeedsTest(unittest.TestCase):
         self.assertEqual(len(uids), len(set(uids)))
         self.assertTrue(by_scope["public"])
         self.assertTrue(by_scope["internal"])
+
+    def test_bilingual_policy_requires_both_languages(self) -> None:
+        for value in ("会议 / Meeting", "H4-103 室 / Room H4-103", "中文 / English / More"):
+            self.assertTrue(is_bilingual(value), value)
+        for value in ("", "H4-103 / H4-103", "Meeting / Meeting", "中文 / 中文",
+                      " / English", "中文 / ", "English / 中文",
+                      "Meeting / 中文 / English", "中文/English"):
+            self.assertFalse(is_bilingual(value), value)
+
+    def test_validate_and_build_reject_invalid_text_before_replacing_output(self) -> None:
+        root = Path(self.temporary_directory.name) / "sources"
+        relative = "internal/2026/10/invalid-text.ics"
+        self.write_source_event(root, relative, "invalid-text",
+                                datetime(2026, 10, 21, tzinfo=ZoneInfo("Asia/Shanghai")))
+        path = root / relative
+        original = path.read_bytes()
+        marker = self.output / "keep.txt"
+        marker.write_text("previous release")
+        for field in ("SUMMARY", "LOCATION", "X-APPLE-STRUCTURED-LOCATION"):
+            with self.subTest(field=field):
+                calendar = Calendar.from_ical(original)
+                event = calendar.walk("VEVENT")[0]
+                if field == "X-APPLE-STRUCTURED-LOCATION":
+                    event.add(field, "geo:30,120", parameters={"X-TITLE": "H4-103 / H4-103"})
+                else:
+                    event[field] = "H4-103 / H4-103"
+                path.write_bytes(calendar.to_ical())
+                with self.assertRaisesRegex(ValueError, field):
+                    validate_source_text(load_source_events(root))
+                for include_restricted in (True, False):
+                    with self.assertRaisesRegex(ValueError, field):
+                        build_site(root, self.output, REPOSITORY_ROOT / "web",
+                                   include_restricted=include_restricted)
+                    self.assertEqual(marker.read_text(), "previous release")
 
     def test_public_build_excludes_restricted_data_everywhere(self) -> None:
         root = Path(self.temporary_directory.name) / "sources"

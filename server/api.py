@@ -192,7 +192,7 @@ def register_calendar(app, *, state, current_user, csrf_token):
                 or asset.startswith(".") or ".." in Path(asset).parts):
             abort(404)
         # UI-only upgrades must not mutate an immutable published event release.
-        if asset in {"calendar.html", "calendar.js", "workspace.css"}:
+        if asset in {"calendar.html", "calendar.js", "calendar-validation.js", "workspace.css"}:
             return send_from_directory(Path(__file__).resolve().parents[1] / "web", asset)
         return send_from_directory(state / "current", asset)
 
@@ -204,7 +204,7 @@ def register_calendar(app, *, state, current_user, csrf_token):
         if asset in {"index.html", "events.html"}:
             return redirect("/calendar/")
         if asset in {"calendar.html", "calendar-config.json", "calendar.css", "workspace.css",
-                     "calendar.js", "calendar-preferences.js", "calendar-account.js",
+                     "calendar.js", "calendar-preferences.js", "calendar-account.js", "calendar-validation.js",
                      "login.css", "login.js", "mark.png"}:
             return None
         if asset in {"vendor/fullcalendar.js", "vendor/fullcalendar-locales.js",

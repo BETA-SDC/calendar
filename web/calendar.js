@@ -453,6 +453,12 @@
       end: field("end").value, description: field("description").value, sourceUrl: field("sourceUrl").value,
       alarmMode: field("alarmMode").value,
     };
+    for (const [key, label] of [["title", "标题"], ["location", "地点"]]) {
+      if ((payload[key] || key === "title") && !CalendarValidation.isBilingual(payload[key])) {
+        $("#form-error").textContent = `${label}须填写中文 / English：中文栏须含中文，英文栏须含英文字母。`;
+        return;
+      }
+    }
     if (payload.alarmMode === "set") payload.alarmMinutes = Number(field("alarmMinutes").value);
     if (selected) payload.version = selected.version;
     try { await publish(selected ? `/events/${encodeURIComponent(selected.uid)}` : "/events", selected ? "PATCH" : "POST", payload); }

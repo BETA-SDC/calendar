@@ -116,6 +116,10 @@ alarmMode,alarmMinutes,version`。双语字段使用 `中文 / English`；
 日期表示全天，带时间表示定时；未带时区时按北京时间。
 全天结束日期排他。`alarmMode` 是 `keep/clear/set`，只有 `set`
 携带 `alarmMinutes`。空地点会清除 LOCATION。未传字段保持原值。
+标题和非空地点的中文部分须包含汉字，英文部分须包含英文字母；
+仅重复房间编号（例如 `H4-103 / H4-103`）不满足双语要求，可写为
+`H4-103 室 / Room H4-103`。网页、API、CLI 和发布构建采用相同规则，
+API 在入队前返回 422，worker 在推送前再次检查所有源事件，避免保存后才被 CI 拒绝。
 
 事件返回 `uid,version,recurring,actions` 等展示字段。
 `version` 是源路径与 ICS 字节的 SHA-256；过期版本在入队时返回 409，

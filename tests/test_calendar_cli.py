@@ -60,6 +60,38 @@ class CalendarCliTest(unittest.TestCase):
             for path in (self.root / scope).rglob("*.ics")
         }
 
+    def test_bilingual_mutations_reject_language_missing_on_either_side(self) -> None:
+        before = self.source_snapshot()
+        for field in ("--title", "--location"):
+            for value in ("H4-103 / H4-103", "English / English", "中文 / 中文",
+                          "中文 / ", " / English", "English / 中文"):
+                with self.subTest(field=field, value=value):
+                    result = self.run_cli(
+                        "add", "-s", "internal", "--title", "测试 / Test",
+                        "--start", "2026-12-01T19:00", "--duration-minutes", "60",
+                        field, value, check=False,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("Chinese characters", result.stderr)
+                    self.assertEqual(self.source_snapshot(), before)
+
+    def test_validate_and_build_reject_invalid_source_location(self) -> None:
+        added = self.add_event("--location", "H4-103 室 / Room H4-103")
+        path = self.root / added["path"]
+        calendar = Calendar.from_ical(path.read_bytes())
+        calendar.walk("VEVENT")[0]["LOCATION"] = "H4-103 / H4-103"
+        path.write_bytes(calendar.to_ical())
+        before = self.source_snapshot()
+        for command in ("validate", "build"):
+            result = self.run_cli(command, "-j", check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("LOCATION", result.stderr)
+            self.assertEqual(self.source_snapshot(), before)
+        inspected = json.loads(self.run_cli("inspect", str(path), "-j").stdout)
+        self.assertIn("LOCATION needs bilingual --location", inspected["events"][0]["issues"])
+        self.run_cli("update", added["uid"], "--location", "H4-103 室 / Room H4-103")
+        self.run_cli("validate", "-j")
+
     def issue_fixture(self, schedule: str, number: int = 999) -> Path:
         path = self.root / "issue.json"
         path.write_text(json.dumps({

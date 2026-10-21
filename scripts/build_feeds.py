@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 from collections import defaultdict
 from dataclasses import dataclass
@@ -29,8 +30,14 @@ BASE_URL = "https://beta-sdc.github.io/calendar"
 WEB_ASSETS = (
     "index.html", "events.html", "styles.css", "access.js", "app.js", "events.js",
     "calendar.html", "calendar.css", "calendar.js", "login.html", "login.css", "login.js", "mark.png",
-    "workspace.css", "calendar-preferences.js", "calendar-account.js",
+    "workspace.css", "calendar-preferences.js", "calendar-account.js", "calendar-validation.js",
 )
+
+
+def is_bilingual(value: str) -> bool:
+    chinese, separator, english = value.partition(" / ")
+    return bool(separator and re.search(r"[\u4e00-\u9fff]", chinese)
+                and re.search(r"[A-Za-z]", english))
 
 
 @dataclass(frozen=True)
@@ -124,6 +131,25 @@ def load_source_events(source_root: Path) -> dict[str, list[SourceEvent]]:
             )
 
     return by_scope
+
+
+def validate_source_text(by_scope: dict[str, list[SourceEvent]]) -> None:
+    for entries in by_scope.values():
+        for entry in entries:
+            fields = {"SUMMARY": str(entry.event.get("SUMMARY", ""))}
+            if entry.event.get("LOCATION"):
+                fields["LOCATION"] = str(entry.event["LOCATION"])
+            structured = entry.event.get("X-APPLE-STRUCTURED-LOCATION")
+            if structured is not None:
+                fields["X-APPLE-STRUCTURED-LOCATION X-TITLE"] = str(
+                    structured.params.get("X-TITLE", "")
+                )
+            for field, value in fields.items():
+                if not is_bilingual(value):
+                    raise ValueError(
+                        f"{entry.path}: {field} must use 中文 / English "
+                        "(Chinese characters before / and English letters after /)"
+                    )
 
 
 def build_calendar(name: str, entries: Iterable[SourceEvent]) -> Calendar:
@@ -286,11 +312,12 @@ def build_site(
     include_restricted: bool = True,
 ) -> None:
     web_root = web_root or source_root / "web"
+    by_scope = load_source_events(source_root)
+    validate_source_text(by_scope)
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
 
-    by_scope = load_source_events(source_root)
     if not include_restricted:
         by_scope = {
             scope: [entry for entry in entries if not entry.requires_key]

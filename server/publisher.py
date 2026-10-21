@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from build_feeds import build_site, load_source_events, serialize_event  # noqa: E402
+from build_feeds import build_site, is_bilingual, load_source_events, serialize_event  # noqa: E402
 
 ZONE = ZoneInfo("Asia/Shanghai")
 FIELDS = {"title", "location", "description", "sourceUrl", "scope", "status",
@@ -50,9 +50,9 @@ def validate_payload(payload, operation):
             raise ValueError(f"字段格式无效：{key}")
     for key in ("title", "location"):
         if key in payload and (payload[key] or key == "title"):
-            parts = payload[key].split(" / ", 1)
-            if len(parts) != 2 or not all(part.strip() for part in parts):
-                raise ValueError("标题和地点须填写中文 / English。")
+            if not is_bilingual(payload[key]):
+                label = "标题" if key == "title" else "地点"
+                raise ValueError(f"{label}须填写中文 / English：左侧须含中文，右侧须含英文字母。")
     for key, allowed in (("scope", ("public", "internal")), ("status", ("planned", "tentative")),
                          ("alarmMode", ("keep", "clear", "set"))):
         if key in payload and payload[key] not in allowed:
