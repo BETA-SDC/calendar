@@ -9,16 +9,13 @@ import sqlite3
 import time
 
 from .publisher import PublicationError, Publisher, RetryPublication
+from .access import organization_access
 from .store import Store
 
 
-def owner_access(database, user_id):
+def member_access(database, user_id):
     with closing(sqlite3.connect(Path(database).resolve().as_uri() + "?mode=ro", uri=True)) as connection:
-        return connection.execute(
-            "SELECT 1 FROM github_admin_grants a JOIN github_accounts g ON g.user_id=a.user_id "
-            "WHERE a.user_id=? AND a.valid_until>?",
-            (user_id, int(time.time())),
-        ).fetchone() is not None
+        return organization_access(connection, user_id)["member"]
 
 
 def main():
@@ -34,7 +31,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     store = Store(args.state / "calendar.sqlite3")
     publisher = Publisher(args.state, args.remote, store, args.branch,
-                          can_manage=lambda user_id: owner_access(args.registration_database, user_id))
+                          can_manage=lambda user_id: member_access(args.registration_database, user_id))
     stopping = False
     def stop(*_):
         nonlocal stopping

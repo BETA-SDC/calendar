@@ -3,12 +3,12 @@ from datetime import date, datetime
 import json
 from pathlib import Path
 import secrets
-import time
 import uuid
 import re
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, abort, current_app, jsonify, redirect, request, send_from_directory, session
+from .access import organization_access
 from .publisher import validate_payload
 from .store import Store
 
@@ -29,29 +29,15 @@ def register_calendar(app, *, state, current_user, csrf_token):
         registration_store = current_app.extensions.get("registration_store")
         if registration_store is None:
             return {"role": "viewer", "member": False, "owner": False}
-        now = int(time.time())
         with registration_store.connection() as connection:
-            owner = connection.execute(
-                "SELECT 1 FROM github_admin_grants a JOIN github_accounts g ON g.user_id=a.user_id "
-                "WHERE a.user_id=? AND a.valid_until>?",
-                (account["id"], now),
-            ).fetchone() is not None
-            member = connection.execute(
-                "SELECT 1 FROM group_members m JOIN account_groups g ON g.id=m.group_id "
-                "JOIN github_accounts a ON a.user_id=m.user_id "
-                "WHERE m.user_id=? AND m.source='github' AND g.external_key=? AND g.archived=0 "
-                "AND (m.valid_until IS NULL OR m.valid_until>?)",
-                (account["id"], "github:org:BETA-SDC", now),
-            ).fetchone() is not None
-        return {"role": "owner" if owner else "member" if member else "viewer",
-                "member": member or owner, "owner": owner}
+            return organization_access(connection, account["id"])
 
-    def require_owner():
+    def require_member():
         account = user()
         if not account:
             abort(401, description="请先登录。")
-        if not account_access(account)["owner"]:
-            abort(403, description="只有 BETA-SDC Owner 可以管理日历。")
+        if not account_access(account)["member"]:
+            abort(403, description="只有 BETA-SDC 成员可以管理日历。")
         return account
 
     @api.before_request
@@ -81,7 +67,7 @@ def register_calendar(app, *, state, current_user, csrf_token):
         access = account_access(account)
         return jsonify(user={"id": account["id"], "username": account["username"]} if account else None,
                        role=access["role"], isMember=access["member"], isOwner=access["owner"],
-                       canViewAll=access["member"], canEdit=access["owner"],
+                       canViewAll=access["member"], canEdit=access["member"],
                        csrf_token=csrf_token(),
                        loginUrl=app.config.get("CALENDAR_LOGIN_URL", "/login"))
 
@@ -125,13 +111,13 @@ def register_calendar(app, *, state, current_user, csrf_token):
             if first and (end < first or (event["allDay"] and event["end"] and end == first)):
                 continue
             result.append(event | {"actions": {
-                "edit": access["owner"] and not event["recurring"],
-                "delete": access["owner"],
+                "edit": access["member"] and not event["recurring"],
+                "delete": access["member"],
             }})
         return jsonify(events=result)
 
     def queue(operation, uid=None):
-        actor = require_owner()
+        actor = require_member()
         payload = request.get_json()
         try:
             validate_payload(payload, operation)

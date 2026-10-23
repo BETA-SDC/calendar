@@ -12,7 +12,7 @@ from icalendar import Calendar
 from server.api import register_calendar
 from server.publisher import PublicationError, Publisher, RetryPublication, ROOT, run, snapshot
 from server.store import Store
-from server.worker import owner_access
+from server.worker import member_access
 
 
 class OnlineCalendarTest(unittest.TestCase):
@@ -57,7 +57,7 @@ class OnlineCalendarTest(unittest.TestCase):
             db.execute("INSERT INTO group_members VALUES(4,1,'github',?)", (until,))
         self.accounts[4] = {"id": 4, "username": "member"}
         self.app.extensions["registration_store"] = self.registration
-        self.publisher.can_manage = lambda user_id: owner_access(self.registration.path, user_id)
+        self.publisher.can_manage = lambda user_id: member_access(self.registration.path, user_id)
         register_calendar(self.app, state=self.state,
                           current_user=lambda: self.accounts.get(session.get("user_id")),
                           csrf_token=lambda: session.setdefault("csrf_token", "csrf-test"))
@@ -174,13 +174,33 @@ class OnlineCalendarTest(unittest.TestCase):
         with self.assertRaisesRegex(PublicationError, "撤销"):
             self.publisher.process(self.store.job(job_id))
 
-    def test_member_reads_all_but_only_owner_can_write(self):
+    def test_member_can_create_update_and_delete_without_owner_grant(self):
         self.login(4)
         capabilities = self.client.get("/api/calendar/session").json
         self.assertTrue(capabilities["canViewAll"])
-        self.assertFalse(capabilities["canEdit"])
-        self.assertEqual(len(self.client.get("/api/calendar/events").json["events"]), len(self.data()))
-        self.assertEqual(self.send("POST", "/events", self.payload | {"status": "tentative"}).status_code, 403)
+        self.assertTrue(capabilities["canEdit"])
+        self.assertFalse(capabilities["isOwner"])
+        self.assertTrue(member_access(self.registration.path, 4))
+        events = self.client.get("/api/calendar/events").json["events"]
+        self.assertEqual(len(events), len(self.data()))
+        self.assertTrue(all(event["actions"]["delete"] for event in events))
+        self.assertTrue(all(event["actions"]["edit"] == (not event["recurring"]) for event in events))
+        response = self.send("POST", "/events", self.payload | {"status": "tentative"})
+        self.assertEqual(response.status_code, 202)
+        job = self.store.job(response.json["id"])
+        self.publisher.process(job)
+        event = next(item for item in self.data() if item["uid"] == job["uid"])
+        for method, payload in (
+            ("PATCH", {"version": event["version"], "title": "成员更新 / Member update"}),
+            ("DELETE", None),
+        ):
+            if method == "DELETE":
+                event = next(item for item in self.data() if item["uid"] == job["uid"])
+                payload = {"version": event["version"]}
+            response = self.send(method, "/events/" + event["uid"], payload)
+            self.assertEqual(response.status_code, 202)
+            self.publisher.process(self.store.job(response.json["id"]))
+        self.assertFalse(any(item["uid"] == job["uid"] for item in self.data()))
         self.login(1)
         self.assertTrue(self.client.get("/api/calendar/session").json["isOwner"])
         self.assertEqual(self.send("POST", "/events", self.payload | {"status": "tentative"}).status_code, 202)
@@ -190,7 +210,7 @@ class OnlineCalendarTest(unittest.TestCase):
         with self.registration.connection() as db:
             db.execute("UPDATE github_admin_grants SET valid_until=0 WHERE user_id=1")
         self.assertFalse(self.client.get("/api/calendar/session").json["canEdit"])
-        self.assertFalse(owner_access(self.registration.path, 1))
+        self.assertFalse(member_access(self.registration.path, 1))
         self.login(4)
         with self.registration.connection() as db:
             db.execute("DELETE FROM github_accounts WHERE user_id=4")
@@ -199,6 +219,40 @@ class OnlineCalendarTest(unittest.TestCase):
         self.assertFalse(self.client.get("/api/calendar/session").json["canEdit"])
         self.app.extensions.pop("registration_store")
         self.assertFalse(self.client.get("/api/calendar/session").json["canEdit"])
+
+    def test_member_revocation_blocks_requests_and_pending_publications(self):
+        changes = (
+            "DELETE FROM group_members WHERE user_id=4",
+            "UPDATE group_members SET valid_until=0 WHERE user_id=4",
+            "UPDATE group_members SET source='local' WHERE user_id=4",
+            "UPDATE account_groups SET archived=1 WHERE id=1",
+            "UPDATE account_groups SET external_key='github:org:Other' WHERE id=1",
+            "DELETE FROM github_accounts WHERE user_id=4",
+        )
+        self.login(4)
+        for change in changes:
+            with self.subTest(change=change):
+                with self.registration.connection() as db:
+                    db.execute("INSERT OR IGNORE INTO github_accounts VALUES(4)")
+                    db.execute("DELETE FROM group_members WHERE user_id=4")
+                    db.execute("UPDATE account_groups SET archived=0, external_key='github:org:BETA-SDC' WHERE id=1")
+                    db.execute("INSERT INTO group_members VALUES(4,1,'github',NULL)")
+                self.assertTrue(member_access(self.registration.path, 4))
+                response = self.send("POST", "/events", self.payload)
+                self.assertEqual(response.status_code, 202)
+                job_id = response.json["id"]
+                before = self.git("rev-parse", "HEAD", cwd=self.remote)
+                active = (self.state / "current").readlink()
+                with self.registration.connection() as db:
+                    db.execute(change)
+                self.assertFalse(member_access(self.registration.path, 4))
+                self.assertFalse(self.client.get("/api/calendar/session").json["canEdit"])
+                self.assertEqual(self.send("POST", "/events", self.payload).status_code, 403)
+                with self.assertRaisesRegex(PublicationError, "撤销"):
+                    self.publisher.process(self.store.job(job_id))
+                self.store.finish(job_id, "failed", error="Membership revoked")
+                self.assertEqual(self.git("rev-parse", "HEAD", cwd=self.remote), before)
+                self.assertEqual((self.state / "current").readlink(), active)
 
     def test_api_conflict_and_schema_validation(self):
         self.login(1)
