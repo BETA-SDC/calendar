@@ -18,7 +18,7 @@ Calendar view (day, week, month, quarter, year):
 
 https://beta-sdc.github.io/calendar/calendar.html
 
-Web View and Simple Way to Edit Calendar:
+Web view & Simple way to maintain the Calendar:
 
 https://calendar.betasdc.duckdns.org/calendar/
 
