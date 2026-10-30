@@ -18,6 +18,10 @@ Calendar view (day, week, month, quarter, year):
 
 https://beta-sdc.github.io/calendar/calendar.html
 
+Web view & Simple way to maintain the Calendar:
+
+https://calendar.betasdc.duckdns.org/calendar/
+
 The FullCalendar page is read-only on Pages and supports authenticated editing
 when integrated with the beta login service. See [在线日历部署](docs/online-calendar.md)
 for roles, API contracts, the publication worker, installation, and rollback.
