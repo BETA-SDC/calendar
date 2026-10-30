@@ -22,25 +22,20 @@ TZOFFSETTO:+0900
 END:DAYLIGHT
 END:VTIMEZONE
 BEGIN:VEVENT
-SUMMARY:拼豆活动（时间待定） / Fuse Bead Workshop (Time TBD)
-DTSTART;VALUE=DATE:20261108
-DTEND;VALUE=DATE:20261109
-DTSTAMP:20261021T172340Z
+SUMMARY:拼豆活动 / Fuse Bead Workshop
+DTSTART;TZID=Asia/Shanghai:20261108T140000
+DTEND;TZID=Asia/Shanghai:20261108T200000
+DTSTAMP:20261030T043115Z
 UID:beta-sdc-event-proposal-40@beta-sdc.github.io
-SEQUENCE:0
+SEQUENCE:1
 CREATED:20261021T172340Z
-DESCRIPTION:活动日期：2026-11-08，具体起止时间和地点待定
- 。全天条目仅为日期占位，并非全天活动。 / Date: 2026-11-
- 08\; exact start/end times and venue are to be confirmed. This all-day ent
- ry is a date placeholder\, not an all-day activity. 活动形式：手工
- 拼豆，在期中考试后帮助同学们放松。 / Format: a hands-on f
- use bead workshop to relax after midterm exams. 负责人：王绎如 @Elo
- iseWarm；相关成员：梁皓然 @toby600。材料：需要购买拼豆
- 用豆。报名、活动群及图案任务：event-proposal#82；现场执
- 行：event-proposal#83，成员待定。
-LAST-MODIFIED:20261021T172340Z
-LOCATION:地点待定 / Venue TBD
-STATUS:TENTATIVE
+DESCRIPTION:期中考试后的手工拼豆活动，帮助同学们放松
+ 。负责人：王绎如；相关成员：梁皓然、赵佐韩。 / A han
+ ds-on fuse bead workshop to relax after midterm exams. Lead: Yiru Wang\; m
+ embers: Haoran Liang and Zuohan Zhao.
+LAST-MODIFIED:20261030T043115Z
+LOCATION:H4-103教室 / Room H4-103
+STATUS:CONFIRMED
 TRANSP:OPAQUE
 URL:https://github.com/BETA-SDC/event-proposal/issues/40
 END:VEVENT
